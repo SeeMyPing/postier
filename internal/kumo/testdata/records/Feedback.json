@@ -1,0 +1,49 @@
+{
+  "size": 2539,
+  "num_attempts": 0,
+  "event_time": "2026-11-13T12:22:50.703353172Z",
+  "type": "Feedback",
+  "feedback_report": {
+    "authentication_results": {},
+    "extensions": {},
+    "user_agent": "smtpsink/1.0",
+    "original_message": "DKIM-Signature: v=1; a=rsa-sha256; d=acme.test; s=pst1; c=relaxed/relaxed;\n\tbh=psxLjyU7U8wLyRgh8ch/YiFYSzlNhejG0yACJkxGqTA=;\n\th=from:to:subject:date:message-id:reply-to:mime-version:content-type;\n\tt=1794572570;\n\tb=c7uUFHbsSioBbLWiw7zjYYTiy2s/nlGEJZBtbPyx6vPgbPy/AWz9SGbVSenBa03m7pW4gBPcu\n\t6QoMOWUUGmRexfCLnRcHxbh17/py/BzX24MldCf5DIjXeGSU51uTwN2ircpoqpD//bwZLahEeS7\n\ta3JQ2oR4KNrquZGeF+eC2PPYJV+b47NUSS7OuVPnZmcEYHMbueULXomxRgsf/a2U8H7516tPxmw\n\t2JiIHQFH2Lqt0A2so7Mo+kLKW5tDmzPRKcLcCrW1lvhuNevEO/PbfyjRqVZyqn+Rki28hFFkGpq\n\twI4HMpvIa9rM/Jt5o2gxzwsxad7R7ZUMlyxyQi8wd0hA==;\nContent-Type: multipart/alternative;\n\tboundary=\"eaaab4e84042d386b5c97e1fa4a8644fd0860d2dac0aa53aa738e551d60e\"\nMessage-ID: <01a1d4dc4e3776e0a6f4357315417f62.nmdc64da@acme.test>\nMIME-Version: 1.0\nSubject: Capture fbl-cap@sink.test\nTo: <fbl-cap@sink.test>\nFrom: Acme <no-reply@acme.test>\nDate: Fri, 13 Nov 2026 12:22:50 +0000\n\n--eaaab4e84042d386b5c97e1fa4a8644fd0860d2dac0aa53aa738e551d60e\nContent-Type: text/plain;\n\tcharset=\"us-ascii\"\nContent-Disposition: inline\n\nBonjour\n--eaaab4e84042d386b5c97e1fa4a8644fd0860d2dac0aa53aa738e551d60e\nContent-Type: text/html;\n\tcharset=\"us-ascii\"\nContent-Disposition: inline\n\n<p>Bonjour</p>\n--eaaab4e84042d386b5c97e1fa4a8644fd0860d2dac0aa53aa738e551d60e--\n\n",
+    "version": "1",
+    "reported_uri": {},
+    "reported_domain": {},
+    "original_rcpto_to": [
+      "fbl-cap@sink.test"
+    ],
+    "reporting_mta": {
+      "mta_type": "dns",
+      "name": "sink.test"
+    },
+    "original_mail_from": "b+01a1d4dc4e3776e0a6f4357315417f62.b6lfmxix@bounce.acme.test",
+    "feedback_type": "abuse",
+    "arrival_date": "2026-11-13T12:22:50Z"
+  },
+  "headers": {
+    "Message-ID": "<arf-1794572570689099470@sink.test>"
+  },
+  "bounce_classification": "Uncategorized",
+  "reception_protocol": "ESMTP",
+  "session_id": "0f8ff6c7-a5e2-43fa-bc04-3e01c446cbfb",
+  "meta": {},
+  "id": "f181bf8bdf5c11f1968566ff4c2d792e",
+  "created": 1794572570,
+  "created_time": "2026-11-13T12:22:50.699354700Z",
+  "queue": "fbl.postier.test",
+  "peer_address": {
+    "addr": "10.89.0.5",
+    "name": "sink.test"
+  },
+  "site": "",
+  "nodeid": "16e621b5-94f9-4154-a769-6c3e3ac14a5b",
+  "sender": "",
+  "response": {
+    "content": "",
+    "code": 250
+  },
+  "recipient": "fbl@fbl.postier.test",
+  "timestamp": 1794572570
+}

@@ -1,0 +1,58 @@
+# SPDX-FileCopyrightText: 2026 Nawer Kezal
+# SPDX-License-Identifier: AGPL-3.0-only
+
+# Quickstart profile: everything on a kind cluster, no DNS, no public IP.
+# Every message is delivered to Mailpit. Use hack/quickstart.sh.
+
+image:
+  # A fully qualified name, so that docker and podman agree on it: podman
+  # would otherwise load "postier:dev" as "localhost/postier:dev".
+  repository: postier.local/postier
+  tag: dev
+  pullPolicy: Never
+
+api:
+  replicas: 1
+dispatch:
+  replicas: 1
+  guardDelay: 5s
+ingest:
+  replicas: 1
+
+kumomta:
+  hostname: mta.postier.test
+  # No public IP to bind to on kind.
+  hostNetwork: false
+  # Helm merges maps: an empty map would keep the default selector. A key is
+  # removed by setting it to null.
+  nodeSelector:
+    postier.dev/mta: null
+  tolerations: []
+  inbound:
+    service:
+      type: ClusterIP
+  dataTTL: 5 seconds
+  storage:
+    size: 1Gi
+  queue:
+    retryInterval: 10 seconds
+    maxRetryInterval: 1 minute
+    maxAge: 10 minutes
+
+postgres:
+  storage:
+    size: 1Gi
+
+domains:
+  - domain: acme.test
+    selector: pst1
+
+feedbackDomain: fbl.postier.test
+
+seed:
+  enabled: true
+  tenant: acme
+
+# Also routes every destination to it.
+mailpit:
+  enabled: true

@@ -1,0 +1,133 @@
+{{/*
+SPDX-FileCopyrightText: 2026 Nawer Kezal
+SPDX-License-Identifier: AGPL-3.0-only
+
+The three stateless roles. Same image, different subcommand.
+*/}}
+{{- $name := include "postier.fullname" . }}
+{{- $roles := dict "api" .Values.api "dispatch" .Values.dispatch "ingest" .Values.ingest }}
+{{- range $role, $cfg := $roles }}
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ $name }}-{{ $role }}
+  labels:
+    {{- include "postier.labels" $ | nindent 4 }}
+    app.kubernetes.io/component: {{ $role }}
+spec:
+  replicas: {{ $cfg.replicas }}
+  selector:
+    matchLabels:
+      {{- include "postier.selector" (list $ $role) | nindent 6 }}
+  template:
+    metadata:
+      labels:
+        {{- include "postier.labels" $ | nindent 8 }}
+        app.kubernetes.io/component: {{ $role }}
+      {{- with $.Values.podAnnotations }}
+      annotations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+    spec:
+      automountServiceAccountToken: false
+      {{- with $.Values.imagePullSecrets }}
+      imagePullSecrets:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      # Longer than the 25 s a role takes at most to drain.
+      terminationGracePeriodSeconds: 30
+      topologySpreadConstraints:
+        - maxSkew: 1
+          topologyKey: topology.kubernetes.io/zone
+          whenUnsatisfiable: ScheduleAnyway
+          labelSelector:
+            matchLabels:
+              {{- include "postier.selector" (list $ $role) | nindent 14 }}
+      containers:
+        - name: {{ $role }}
+          image: {{ include "postier.image" $ }}
+          imagePullPolicy: {{ $.Values.image.pullPolicy }}
+          args: [{{ $role | quote }}]
+          securityContext:
+            {{- include "postier.securityContext" $ | nindent 12 }}
+          env:
+            - name: POSTIER_LOG_LEVEL
+              value: {{ $.Values.logLevel | quote }}
+            {{- if eq $role "api" }}
+            {{- include "postier.secretEnv" (list $ "POSTIER_DATABASE_URL" "database-url") | nindent 12 }}
+            {{- else }}
+            {{- include "postier.secretEnv" (list $ "POSTIER_SYSTEM_DATABASE_URL" "system-database-url") | nindent 12 }}
+            {{- include "postier.secretEnv" (list $ "POSTIER_SIGNING_KEY" "signing-key") | nindent 12 }}
+            {{- end }}
+            {{- if eq $role "dispatch" }}
+            - name: POSTIER_KUMO_URL
+              value: http://{{ $name }}-kumomta:8000
+            - name: POSTIER_CONCURRENCY
+              value: {{ $cfg.concurrency | quote }}
+            - name: POSTIER_GUARD_DELAY
+              value: {{ $cfg.guardDelay | quote }}
+            {{- include "postier.secretEnv" (list $ "POSTIER_KUMO_INJECT_PASSWORD" "kumo-inject-password") | nindent 12 }}
+            {{- end }}
+            {{- if eq $role "ingest" }}
+            {{- include "postier.secretEnv" (list $ "POSTIER_INGEST_TOKEN" "ingest-token") | nindent 12 }}
+            {{- end }}
+          ports:
+            - name: probes
+              containerPort: 8090
+            {{- if eq $role "api" }}
+            - name: http
+              containerPort: 8080
+            {{- end }}
+            {{- if eq $role "ingest" }}
+            - name: http
+              containerPort: 8081
+            {{- end }}
+          {{- include "postier.probes" $ | nindent 10 }}
+          resources:
+            {{- toYaml $cfg.resources | nindent 12 }}
+{{- if gt (int $cfg.replicas) 1 }}
+---
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: {{ $name }}-{{ $role }}
+  labels:
+    {{- include "postier.labels" $ | nindent 4 }}
+spec:
+  maxUnavailable: 1
+  selector:
+    matchLabels:
+      {{- include "postier.selector" (list $ $role) | nindent 6 }}
+{{- end }}
+{{- end }}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ $name }}-api
+  labels:
+    {{- include "postier.labels" . | nindent 4 }}
+spec:
+  type: {{ .Values.api.service.type }}
+  selector:
+    {{- include "postier.selector" (list . "api") | nindent 4 }}
+  ports:
+    - name: http
+      port: {{ .Values.api.service.port }}
+      targetPort: http
+---
+# Reached by KumoMTA's log hook only.
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ $name }}-ingest
+  labels:
+    {{- include "postier.labels" . | nindent 4 }}
+spec:
+  selector:
+    {{- include "postier.selector" (list . "ingest") | nindent 4 }}
+  ports:
+    - name: http
+      port: 8081
+      targetPort: http

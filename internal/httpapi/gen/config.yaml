@@ -1,0 +1,9 @@
+# SPDX-FileCopyrightText: 2026 Nawer Kezal
+# SPDX-License-Identifier: AGPL-3.0-only
+package: gen
+output: api.gen.go
+generate:
+  models: true
+  std-http-server: true
+output-options:
+  skip-prune: false

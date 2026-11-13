@@ -1,0 +1,35 @@
+{
+  "size": 0,
+  "num_attempts": 0,
+  "event_time": "2026-11-13T12:22:50Z",
+  "type": "OOB",
+  "peer_address": {
+    "addr": "10.89.0.5",
+    "name": "sink.test"
+  },
+  "headers": {
+    "Message-ID": "<dsn-1794572570686145539@sink.test>"
+  },
+  "bounce_classification": "InvalidRecipient",
+  "reception_protocol": "ESMTP",
+  "session_id": "9c81dcb8-b177-43aa-ad64-e931e6e1de64",
+  "meta": {},
+  "id": "f1826211df5c11f1968766ff4c2d792e",
+  "created": 1794572570,
+  "queue": "bounce.acme.test",
+  "created_time": "2026-11-13T12:22:50.703515300Z",
+  "site": "",
+  "response": {
+    "content": "5.1.1 The email account that you tried to reach does not exist",
+    "enhanced_code": {
+      "class": 5,
+      "subject": 1,
+      "detail": 1
+    },
+    "code": 550
+  },
+  "sender": "b+01a1d4dc4e1e76c18f5c8a5104f88ec7.zjqnhixg@bounce.acme.test",
+  "nodeid": "16e621b5-94f9-4154-a769-6c3e3ac14a5b",
+  "recipient": "oob-cap@sink.test",
+  "timestamp": 1794572570
+}

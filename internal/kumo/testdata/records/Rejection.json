@@ -1,0 +1,33 @@
+{
+  "size": 0,
+  "num_attempts": 0,
+  "event_time": "2026-11-13T12:22:50.324522594Z",
+  "type": "Rejection",
+  "peer_address": {
+    "addr": "127.0.0.1",
+    "name": "probe.test"
+  },
+  "headers": {},
+  "bounce_classification": "AuthenticationFailed",
+  "session_id": "91345d16-0d5e-4035-a626-1b7961dc5798",
+  "meta": {},
+  "id": "",
+  "created": 1794572570,
+  "queue": "",
+  "created_time": "2026-11-13T12:22:50.324522594Z",
+  "site": "",
+  "response": {
+    "content": "relaying denied",
+    "enhanced_code": {
+      "class": 5,
+      "subject": 7,
+      "detail": 1
+    },
+    "command": "RCPT TO:<x@unknown.test>",
+    "code": 550
+  },
+  "recipient": "",
+  "nodeid": "16e621b5-94f9-4154-a769-6c3e3ac14a5b",
+  "sender": "a@probe.test",
+  "timestamp": 1794572570
+}

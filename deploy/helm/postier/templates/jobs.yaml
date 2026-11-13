@@ -1,0 +1,119 @@
+{{/*
+SPDX-FileCopyrightText: 2026 Nawer Kezal
+SPDX-License-Identifier: AGPL-3.0-only
+*/}}
+{{- $name := include "postier.fullname" . }}
+# Migrations. One Job per release revision, not a Helm hook: on a first
+# install the bundled Postgres does not exist yet when hooks would run. The
+# Job retries until the database answers, and the roles restart until the
+# schema is there. Migrations are expand-only, so the previous version of
+# the roles keeps working while this runs.
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: {{ $name }}-migrate-{{ .Release.Revision }}
+  labels:
+    {{- include "postier.labels" . | nindent 4 }}
+    app.kubernetes.io/component: migrate
+spec:
+  backoffLimit: 30
+  ttlSecondsAfterFinished: 86400
+  template:
+    metadata:
+      labels:
+        {{- include "postier.labels" . | nindent 8 }}
+        app.kubernetes.io/component: migrate
+    spec:
+      restartPolicy: OnFailure
+      automountServiceAccountToken: false
+      {{- with .Values.imagePullSecrets }}
+      imagePullSecrets:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      containers:
+        - name: migrate
+          image: {{ include "postier.image" . }}
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          args: ["migrate"]
+          securityContext:
+            {{- include "postier.securityContext" . | nindent 12 }}
+          env:
+            {{- include "postier.secretEnv" (list . "POSTIER_MIGRATE_DATABASE_URL" "migrate-database-url") | nindent 12 }}
+{{- if .Values.seed.enabled }}
+---
+# Phase 0 stand-in for the operator: registers `domains` for one tenant and
+# issues an API key. It runs once, after the first install, and not on
+# upgrades: each run would issue another key. Read the key with:
+#   kubectl logs job/{{ $name }}-seed
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: {{ $name }}-seed
+  labels:
+    {{- include "postier.labels" . | nindent 4 }}
+    app.kubernetes.io/component: seed
+  annotations:
+    helm.sh/hook: post-install
+    # Kept after it succeeds, so that its logs, and the key, stay readable.
+    helm.sh/hook-delete-policy: before-hook-creation
+spec:
+  backoffLimit: 30
+  template:
+    metadata:
+      labels:
+        {{- include "postier.labels" . | nindent 8 }}
+        app.kubernetes.io/component: seed
+    spec:
+      restartPolicy: OnFailure
+      automountServiceAccountToken: false
+      {{- with .Values.imagePullSecrets }}
+      imagePullSecrets:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- if not .Values.domains }}
+      {{- fail "seed.enabled requires at least one entry in domains" }}
+      {{- end }}
+      {{- /* Every domain but the last is registered by an init container,
+      whose key is discarded; the last one issues the key that is kept. */}}
+      {{- $last := sub (len .Values.domains) 1 }}
+      {{- if gt (len .Values.domains) 1 }}
+      initContainers:
+        {{- range $i, $d := .Values.domains }}
+        {{- if ne $i $last }}
+        - name: seed-{{ $i }}
+          image: {{ include "postier.image" $ }}
+          imagePullPolicy: {{ $.Values.image.pullPolicy }}
+          args:
+            - seed
+            - --tenant={{ $.Values.seed.tenant }}
+            - --domain={{ $d.domain }}
+            - --selector={{ $d.selector | default "pst1" }}
+            {{- with $d.returnPathDomain }}
+            - --return-path-domain={{ . }}
+            {{- end }}
+          securityContext:
+            {{- include "postier.securityContext" $ | nindent 12 }}
+          env:
+            {{- include "postier.secretEnv" (list $ "POSTIER_SYSTEM_DATABASE_URL" "system-database-url") | nindent 12 }}
+        {{- end }}
+        {{- end }}
+      {{- end }}
+      containers:
+        {{- with index .Values.domains $last }}
+        - name: seed
+          image: {{ include "postier.image" $ }}
+          imagePullPolicy: {{ $.Values.image.pullPolicy }}
+          args:
+            - seed
+            - --tenant={{ $.Values.seed.tenant }}
+            - --domain={{ .domain }}
+            - --selector={{ .selector | default "pst1" }}
+            {{- with .returnPathDomain }}
+            - --return-path-domain={{ . }}
+            {{- end }}
+          securityContext:
+            {{- include "postier.securityContext" $ | nindent 12 }}
+          env:
+            {{- include "postier.secretEnv" (list $ "POSTIER_SYSTEM_DATABASE_URL" "system-database-url") | nindent 12 }}
+        {{- end }}
+{{- end }}

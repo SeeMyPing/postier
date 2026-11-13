@@ -1,0 +1,33 @@
+{
+  "size": 1276,
+  "num_attempts": 0,
+  "event_time": "2026-11-13T12:22:50.056272911Z",
+  "type": "Reception",
+  "peer_address": {
+    "addr": "10.89.0.12",
+    "name": ""
+  },
+  "headers": {
+    "Message-ID": "<01a1d4dc4da976249654f670cd1d1065.oaxwxm5d@acme.test>"
+  },
+  "bounce_classification": "Uncategorized",
+  "reception_protocol": "HTTP",
+  "meta": {
+    "x_postier_trace": "53d7499940b401b366bcb685e8393f12",
+    "tenant": "01a1d4d7-d931-79da-a687-88595865766b",
+    "x_postier_id": "01a1d4dc-4da9-7624-9654-f670cd1d1065"
+  },
+  "id": "f11efc49df5c11f1967166ff4c2d792e",
+  "created": 1794572570,
+  "queue": "01a1d4d7-d931-79da-a687-88595865766b@sink.test",
+  "created_time": "2026-11-13T12:22:50.052103300Z",
+  "site": "",
+  "response": {
+    "content": "",
+    "code": 250
+  },
+  "recipient": "ok@sink.test",
+  "nodeid": "16e621b5-94f9-4154-a769-6c3e3ac14a5b",
+  "sender": "b+01a1d4dc4da976249654f670cd1d1065.k53pvfnv@bounce.acme.test",
+  "timestamp": 1794572570
+}

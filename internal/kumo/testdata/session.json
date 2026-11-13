@@ -1,0 +1,1092 @@
+[
+  {
+    "size": 1276,
+    "num_attempts": 0,
+    "event_time": "2026-11-13T12:22:50.056272911Z",
+    "type": "Reception",
+    "peer_address": {
+      "addr": "10.89.0.12",
+      "name": ""
+    },
+    "headers": {
+      "Message-ID": "\u003c01a1d4dc4da976249654f670cd1d1065.oaxwxm5d@acme.test\u003e"
+    },
+    "bounce_classification": "Uncategorized",
+    "reception_protocol": "HTTP",
+    "meta": {
+      "x_postier_trace": "53d7499940b401b366bcb685e8393f12",
+      "tenant": "01a1d4d7-d931-79da-a687-88595865766b",
+      "x_postier_id": "01a1d4dc-4da9-7624-9654-f670cd1d1065"
+    },
+    "id": "f11efc49df5c11f1967166ff4c2d792e",
+    "created": 1794572570,
+    "queue": "01a1d4d7-d931-79da-a687-88595865766b@sink.test",
+    "created_time": "2026-11-13T12:22:50.052103300Z",
+    "site": "",
+    "response": {
+      "content": "",
+      "code": 250
+    },
+    "recipient": "ok@sink.test",
+    "nodeid": "16e621b5-94f9-4154-a769-6c3e3ac14a5b",
+    "sender": "b+01a1d4dc4da976249654f670cd1d1065.k53pvfnv@bounce.acme.test",
+    "timestamp": 1794572570
+  },
+  {
+    "size": 1276,
+    "num_attempts": 0,
+    "event_time": "2026-11-13T12:22:50.064358419Z",
+    "type": "Delivery",
+    "egress_pool": "unspecified",
+    "egress_source": "unspecified",
+    "peer_address": {
+      "addr": "10.89.0.5",
+      "name": "smtpsink"
+    },
+    "headers": {
+      "Message-ID": "\u003c01a1d4dc4da976249654f670cd1d1065.oaxwxm5d@acme.test\u003e"
+    },
+    "created_time": "2026-11-13T12:22:50.052103300Z",
+    "reception_protocol": "HTTP",
+    "timestamp": 1794572570,
+    "delivery_protocol": "ESMTP",
+    "meta": {
+      "x_postier_trace": "53d7499940b401b366bcb685e8393f12",
+      "tenant": "01a1d4d7-d931-79da-a687-88595865766b",
+      "x_postier_id": "01a1d4dc-4da9-7624-9654-f670cd1d1065"
+    },
+    "id": "f11efc49df5c11f1967166ff4c2d792e",
+    "created": 1794572570,
+    "response": {
+      "content": "OK: queued",
+      "enhanced_code": {
+        "class": 2,
+        "subject": 0,
+        "detail": 0
+      },
+      "command": ".\r\n",
+      "code": 250
+    },
+    "queue": "01a1d4d7-d931-79da-a687-88595865766b@sink.test",
+    "session_id": "abd758f4-2b16-4b06-b888-a516ea946c1f",
+    "site": "unspecified-\u003emx_list:smtpsink@smtp_client",
+    "recipient": "ok@sink.test",
+    "sender": "b+01a1d4dc4da976249654f670cd1d1065.k53pvfnv@bounce.acme.test",
+    "nodeid": "16e621b5-94f9-4154-a769-6c3e3ac14a5b",
+    "bounce_classification": "Uncategorized",
+    "source_address": {
+      "address": "10.89.0.8:56094"
+    }
+  },
+  {
+    "size": 1278,
+    "num_attempts": 0,
+    "event_time": "2026-11-13T12:22:50.175680597Z",
+    "type": "Reception",
+    "peer_address": {
+      "addr": "10.89.0.12",
+      "name": ""
+    },
+    "headers": {
+      "Message-ID": "\u003c01a1d4dc4dd5704eb89089f62aab7d6a.cjlhhpyp@acme.test\u003e"
+    },
+    "bounce_classification": "Uncategorized",
+    "reception_protocol": "HTTP",
+    "meta": {
+      "x_postier_trace": "32fc12d840477da9ab73f0ff2b4b8e74",
+      "tenant": "01a1d4d7-d931-79da-a687-88595865766b",
+      "x_postier_id": "01a1d4dc-4dd5-704e-b890-89f62aab7d6a"
+    },
+    "id": "f131b5cadf5c11f1967466ff4c2d792e",
+    "created": 1794572570,
+    "queue": "01a1d4d7-d931-79da-a687-88595865766b@sink.test",
+    "created_time": "2026-11-13T12:22:50.174817Z",
+    "site": "",
+    "response": {
+      "content": "",
+      "code": 250
+    },
+    "recipient": "550@sink.test",
+    "nodeid": "16e621b5-94f9-4154-a769-6c3e3ac14a5b",
+    "sender": "b+01a1d4dc4dd5704eb89089f62aab7d6a.jginwdtm@bounce.acme.test",
+    "timestamp": 1794572570
+  },
+  {
+    "size": 1286,
+    "num_attempts": 0,
+    "event_time": "2026-11-13T12:22:50.179965599Z",
+    "type": "Reception",
+    "peer_address": {
+      "addr": "10.89.0.12",
+      "name": ""
+    },
+    "headers": {
+      "Message-ID": "\u003c01a1d4dc4e1e76c18f5c8a5104f88ec7.3jt7v3tr@acme.test\u003e"
+    },
+    "bounce_classification": "Uncategorized",
+    "reception_protocol": "HTTP",
+    "meta": {
+      "x_postier_trace": "3f4e4df35b0f063f8f53ad764d84687c",
+      "tenant": "01a1d4d7-d931-79da-a687-88595865766b",
+      "x_postier_id": "01a1d4dc-4e1e-76c1-8f5c-8a5104f88ec7"
+    },
+    "id": "f1325cdcdf5c11f1967666ff4c2d792e",
+    "created": 1794572570,
+    "queue": "01a1d4d7-d931-79da-a687-88595865766b@sink.test",
+    "created_time": "2026-11-13T12:22:50.179094Z",
+    "site": "",
+    "response": {
+      "content": "",
+      "code": 250
+    },
+    "recipient": "oob-cap@sink.test",
+    "nodeid": "16e621b5-94f9-4154-a769-6c3e3ac14a5b",
+    "sender": "b+01a1d4dc4e1e76c18f5c8a5104f88ec7.zjqnhixg@bounce.acme.test",
+    "timestamp": 1794572570
+  },
+  {
+    "size": 1278,
+    "num_attempts": 0,
+    "event_time": "2026-11-13T12:22:50.180452553Z",
+    "type": "Bounce",
+    "egress_pool": "unspecified",
+    "egress_source": "unspecified",
+    "peer_address": {
+      "addr": "10.89.0.5",
+      "name": "smtpsink"
+    },
+    "headers": {
+      "Message-ID": "\u003c01a1d4dc4dd5704eb89089f62aab7d6a.cjlhhpyp@acme.test\u003e"
+    },
+    "created_time": "2026-11-13T12:22:50.174817Z",
+    "reception_protocol": "HTTP",
+    "timestamp": 1794572570,
+    "delivery_protocol": "ESMTP",
+    "meta": {
+      "x_postier_trace": "32fc12d840477da9ab73f0ff2b4b8e74",
+      "tenant": "01a1d4d7-d931-79da-a687-88595865766b",
+      "x_postier_id": "01a1d4dc-4dd5-704e-b890-89f62aab7d6a"
+    },
+    "id": "f131b5cadf5c11f1967466ff4c2d792e",
+    "created": 1794572570,
+    "response": {
+      "content": "The email account that you tried to reach does not exist",
+      "enhanced_code": {
+        "class": 5,
+        "subject": 1,
+        "detail": 1
+      },
+      "command": "RCPT TO:\u003c550@sink.test\u003e\r\n",
+      "code": 550
+    },
+    "queue": "01a1d4d7-d931-79da-a687-88595865766b@sink.test",
+    "session_id": "abd758f4-2b16-4b06-b888-a516ea946c1f",
+    "site": "unspecified-\u003emx_list:smtpsink@smtp_client",
+    "recipient": "550@sink.test",
+    "sender": "b+01a1d4dc4dd5704eb89089f62aab7d6a.jginwdtm@bounce.acme.test",
+    "nodeid": "16e621b5-94f9-4154-a769-6c3e3ac14a5b",
+    "bounce_classification": "InvalidRecipient",
+    "source_address": {
+      "address": "10.89.0.8:56094"
+    }
+  },
+  {
+    "size": 1286,
+    "num_attempts": 0,
+    "event_time": "2026-11-13T12:22:50.182406076Z",
+    "type": "Reception",
+    "peer_address": {
+      "addr": "10.89.0.12",
+      "name": ""
+    },
+    "headers": {
+      "Message-ID": "\u003c01a1d4dc4e3776e0a6f4357315417f62.nmdc64da@acme.test\u003e"
+    },
+    "bounce_classification": "Uncategorized",
+    "reception_protocol": "HTTP",
+    "meta": {
+      "x_postier_trace": "79943eeed17f9a611583e3ae0138d0d5",
+      "tenant": "01a1d4d7-d931-79da-a687-88595865766b",
+      "x_postier_id": "01a1d4dc-4e37-76e0-a6f4-357315417f62"
+    },
+    "id": "f132bb44df5c11f1967866ff4c2d792e",
+    "created": 1794572570,
+    "queue": "01a1d4d7-d931-79da-a687-88595865766b@sink.test",
+    "created_time": "2026-11-13T12:22:50.181510800Z",
+    "site": "",
+    "response": {
+      "content": "",
+      "code": 250
+    },
+    "recipient": "fbl-cap@sink.test",
+    "nodeid": "16e621b5-94f9-4154-a769-6c3e3ac14a5b",
+    "sender": "b+01a1d4dc4e3776e0a6f4357315417f62.b6lfmxix@bounce.acme.test",
+    "timestamp": 1794572570
+  },
+  {
+    "size": 1286,
+    "num_attempts": 0,
+    "event_time": "2026-11-13T12:22:50.184302392Z",
+    "type": "Delivery",
+    "egress_pool": "unspecified",
+    "egress_source": "unspecified",
+    "peer_address": {
+      "addr": "10.89.0.5",
+      "name": "smtpsink"
+    },
+    "headers": {
+      "Message-ID": "\u003c01a1d4dc4e1e76c18f5c8a5104f88ec7.3jt7v3tr@acme.test\u003e"
+    },
+    "created_time": "2026-11-13T12:22:50.179094Z",
+    "reception_protocol": "HTTP",
+    "timestamp": 1794572570,
+    "delivery_protocol": "ESMTP",
+    "meta": {
+      "x_postier_trace": "3f4e4df35b0f063f8f53ad764d84687c",
+      "tenant": "01a1d4d7-d931-79da-a687-88595865766b",
+      "x_postier_id": "01a1d4dc-4e1e-76c1-8f5c-8a5104f88ec7"
+    },
+    "id": "f1325cdcdf5c11f1967666ff4c2d792e",
+    "created": 1794572570,
+    "response": {
+      "content": "OK: queued",
+      "enhanced_code": {
+        "class": 2,
+        "subject": 0,
+        "detail": 0
+      },
+      "command": ".\r\n",
+      "code": 250
+    },
+    "queue": "01a1d4d7-d931-79da-a687-88595865766b@sink.test",
+    "session_id": "abd758f4-2b16-4b06-b888-a516ea946c1f",
+    "site": "unspecified-\u003emx_list:smtpsink@smtp_client",
+    "recipient": "oob-cap@sink.test",
+    "sender": "b+01a1d4dc4e1e76c18f5c8a5104f88ec7.zjqnhixg@bounce.acme.test",
+    "nodeid": "16e621b5-94f9-4154-a769-6c3e3ac14a5b",
+    "bounce_classification": "Uncategorized",
+    "source_address": {
+      "address": "10.89.0.8:56094"
+    }
+  },
+  {
+    "size": 1278,
+    "num_attempts": 0,
+    "event_time": "2026-11-13T12:22:50.184716055Z",
+    "type": "Reception",
+    "peer_address": {
+      "addr": "10.89.0.12",
+      "name": ""
+    },
+    "headers": {
+      "Message-ID": "\u003c01a1d4dc4e0672a09148b0f57dd288f6.vgxgymt2@acme.test\u003e"
+    },
+    "bounce_classification": "Uncategorized",
+    "reception_protocol": "HTTP",
+    "meta": {
+      "x_postier_trace": "6c91d6048222a78957f9b805507f3fb6",
+      "tenant": "01a1d4d7-d931-79da-a687-88595865766b",
+      "x_postier_id": "01a1d4dc-4e06-72a0-9148-b0f57dd288f6"
+    },
+    "id": "f1330ba1df5c11f1967b66ff4c2d792e",
+    "created": 1794572570,
+    "queue": "01a1d4d7-d931-79da-a687-88595865766b@sink.test",
+    "created_time": "2026-11-13T12:22:50.183568100Z",
+    "site": "",
+    "response": {
+      "content": "",
+      "code": 250
+    },
+    "recipient": "421@sink.test",
+    "nodeid": "16e621b5-94f9-4154-a769-6c3e3ac14a5b",
+    "sender": "b+01a1d4dc4e0672a09148b0f57dd288f6.25qaat6j@bounce.acme.test",
+    "timestamp": 1794572570
+  },
+  {
+    "size": 1292,
+    "num_attempts": 0,
+    "event_time": "2026-11-13T12:22:50.187091908Z",
+    "type": "Reception",
+    "peer_address": {
+      "addr": "10.89.0.12",
+      "name": ""
+    },
+    "headers": {
+      "Message-ID": "\u003c01a1d4dc4dee7bf5ba626c8ceba0632c.4tbv2t42@acme.test\u003e"
+    },
+    "bounce_classification": "Uncategorized",
+    "reception_protocol": "HTTP",
+    "meta": {
+      "x_postier_trace": "d5549ec478cfc18145f1cd1d3e7ae8ef",
+      "tenant": "01a1d4d7-d931-79da-a687-88595865766b",
+      "x_postier_id": "01a1d4dc-4dee-7bf5-ba62-6c8ceba0632c"
+    },
+    "id": "f133779cdf5c11f1967e66ff4c2d792e",
+    "created": 1794572570,
+    "queue": "01a1d4d7-d931-79da-a687-88595865766b@sink.test",
+    "created_time": "2026-11-13T12:22:50.186332400Z",
+    "site": "",
+    "response": {
+      "content": "",
+      "code": 250
+    },
+    "recipient": "defer2-cap@sink.test",
+    "nodeid": "16e621b5-94f9-4154-a769-6c3e3ac14a5b",
+    "sender": "b+01a1d4dc4dee7bf5ba626c8ceba0632c.ambxrvji@bounce.acme.test",
+    "timestamp": 1794572570
+  },
+  {
+    "size": 1286,
+    "num_attempts": 0,
+    "event_time": "2026-11-13T12:22:50.187980275Z",
+    "type": "Delivery",
+    "egress_pool": "unspecified",
+    "egress_source": "unspecified",
+    "peer_address": {
+      "addr": "10.89.0.5",
+      "name": "smtpsink"
+    },
+    "headers": {
+      "Message-ID": "\u003c01a1d4dc4e3776e0a6f4357315417f62.nmdc64da@acme.test\u003e"
+    },
+    "created_time": "2026-11-13T12:22:50.181510800Z",
+    "reception_protocol": "HTTP",
+    "timestamp": 1794572570,
+    "delivery_protocol": "ESMTP",
+    "meta": {
+      "x_postier_trace": "79943eeed17f9a611583e3ae0138d0d5",
+      "tenant": "01a1d4d7-d931-79da-a687-88595865766b",
+      "x_postier_id": "01a1d4dc-4e37-76e0-a6f4-357315417f62"
+    },
+    "id": "f132bb44df5c11f1967866ff4c2d792e",
+    "created": 1794572570,
+    "response": {
+      "content": "OK: queued",
+      "enhanced_code": {
+        "class": 2,
+        "subject": 0,
+        "detail": 0
+      },
+      "command": ".\r\n",
+      "code": 250
+    },
+    "queue": "01a1d4d7-d931-79da-a687-88595865766b@sink.test",
+    "session_id": "abd758f4-2b16-4b06-b888-a516ea946c1f",
+    "site": "unspecified-\u003emx_list:smtpsink@smtp_client",
+    "recipient": "fbl-cap@sink.test",
+    "sender": "b+01a1d4dc4e3776e0a6f4357315417f62.b6lfmxix@bounce.acme.test",
+    "nodeid": "16e621b5-94f9-4154-a769-6c3e3ac14a5b",
+    "bounce_classification": "Uncategorized",
+    "source_address": {
+      "address": "10.89.0.8:56094"
+    }
+  },
+  {
+    "size": 1278,
+    "num_attempts": 0,
+    "event_time": "2026-11-13T12:22:50.189845549Z",
+    "type": "TransientFailure",
+    "egress_pool": "unspecified",
+    "egress_source": "unspecified",
+    "peer_address": {
+      "addr": "10.89.0.5",
+      "name": "smtpsink"
+    },
+    "headers": {
+      "Message-ID": "\u003c01a1d4dc4e0672a09148b0f57dd288f6.vgxgymt2@acme.test\u003e"
+    },
+    "created_time": "2026-11-13T12:22:50.183568100Z",
+    "reception_protocol": "HTTP",
+    "timestamp": 1794572570,
+    "delivery_protocol": "ESMTP",
+    "meta": {
+      "x_postier_trace": "6c91d6048222a78957f9b805507f3fb6",
+      "tenant": "01a1d4d7-d931-79da-a687-88595865766b",
+      "x_postier_id": "01a1d4dc-4e06-72a0-9148-b0f57dd288f6"
+    },
+    "id": "f1330ba1df5c11f1967b66ff4c2d792e",
+    "created": 1794572570,
+    "response": {
+      "content": "Try again later, closing connection",
+      "enhanced_code": {
+        "class": 4,
+        "subject": 7,
+        "detail": 0
+      },
+      "command": "RCPT TO:\u003c421@sink.test\u003e\r\n",
+      "code": 421
+    },
+    "queue": "01a1d4d7-d931-79da-a687-88595865766b@sink.test",
+    "session_id": "abd758f4-2b16-4b06-b888-a516ea946c1f",
+    "site": "unspecified-\u003emx_list:smtpsink@smtp_client",
+    "recipient": "421@sink.test",
+    "sender": "b+01a1d4dc4e0672a09148b0f57dd288f6.25qaat6j@bounce.acme.test",
+    "nodeid": "16e621b5-94f9-4154-a769-6c3e3ac14a5b",
+    "bounce_classification": "Uncategorized",
+    "source_address": {
+      "address": "10.89.0.8:56094"
+    }
+  },
+  {
+    "size": 1292,
+    "num_attempts": 0,
+    "event_time": "2026-11-13T12:22:50.191699032Z",
+    "type": "TransientFailure",
+    "egress_pool": "unspecified",
+    "egress_source": "unspecified",
+    "peer_address": {
+      "addr": "10.89.0.5",
+      "name": "smtpsink"
+    },
+    "headers": {
+      "Message-ID": "\u003c01a1d4dc4dee7bf5ba626c8ceba0632c.4tbv2t42@acme.test\u003e"
+    },
+    "created_time": "2026-11-13T12:22:50.186332400Z",
+    "reception_protocol": "HTTP",
+    "timestamp": 1794572570,
+    "delivery_protocol": "ESMTP",
+    "meta": {
+      "x_postier_trace": "d5549ec478cfc18145f1cd1d3e7ae8ef",
+      "tenant": "01a1d4d7-d931-79da-a687-88595865766b",
+      "x_postier_id": "01a1d4dc-4dee-7bf5-ba62-6c8ceba0632c"
+    },
+    "id": "f133779cdf5c11f1967e66ff4c2d792e",
+    "created": 1794572570,
+    "response": {
+      "content": "Temporary system problem, try again later",
+      "enhanced_code": {
+        "class": 4,
+        "subject": 3,
+        "detail": 0
+      },
+      "command": "RCPT TO:\u003cdefer2-cap@sink.test\u003e\r\n",
+      "code": 451
+    },
+    "queue": "01a1d4d7-d931-79da-a687-88595865766b@sink.test",
+    "session_id": "abd758f4-2b16-4b06-b888-a516ea946c1f",
+    "site": "unspecified-\u003emx_list:smtpsink@smtp_client",
+    "recipient": "defer2-cap@sink.test",
+    "sender": "b+01a1d4dc4dee7bf5ba626c8ceba0632c.ambxrvji@bounce.acme.test",
+    "nodeid": "16e621b5-94f9-4154-a769-6c3e3ac14a5b",
+    "bounce_classification": "Uncategorized",
+    "source_address": {
+      "address": "10.89.0.8:56094"
+    }
+  },
+  {
+    "size": 0,
+    "num_attempts": 0,
+    "event_time": "2026-11-13T12:22:50.324522594Z",
+    "type": "Rejection",
+    "peer_address": {
+      "addr": "127.0.0.1",
+      "name": "probe.test"
+    },
+    "headers": {},
+    "bounce_classification": "AuthenticationFailed",
+    "session_id": "91345d16-0d5e-4035-a626-1b7961dc5798",
+    "meta": {},
+    "id": "",
+    "created": 1794572570,
+    "queue": "",
+    "created_time": "2026-11-13T12:22:50.324522594Z",
+    "site": "",
+    "response": {
+      "content": "relaying denied",
+      "enhanced_code": {
+        "class": 5,
+        "subject": 7,
+        "detail": 1
+      },
+      "command": "RCPT TO:\u003cx@unknown.test\u003e",
+      "code": 550
+    },
+    "recipient": "",
+    "nodeid": "16e621b5-94f9-4154-a769-6c3e3ac14a5b",
+    "sender": "a@probe.test",
+    "timestamp": 1794572570
+  },
+  {
+    "size": 2539,
+    "num_attempts": 0,
+    "event_time": "2026-11-13T12:22:50.703353172Z",
+    "type": "Feedback",
+    "feedback_report": {
+      "authentication_results": {},
+      "extensions": {},
+      "user_agent": "smtpsink/1.0",
+      "original_message": "DKIM-Signature: v=1; a=rsa-sha256; d=acme.test; s=pst1; c=relaxed/relaxed;\n\tbh=psxLjyU7U8wLyRgh8ch/YiFYSzlNhejG0yACJkxGqTA=;\n\th=from:to:subject:date:message-id:reply-to:mime-version:content-type;\n\tt=1794572570;\n\tb=c7uUFHbsSioBbLWiw7zjYYTiy2s/nlGEJZBtbPyx6vPgbPy/AWz9SGbVSenBa03m7pW4gBPcu\n\t6QoMOWUUGmRexfCLnRcHxbh17/py/BzX24MldCf5DIjXeGSU51uTwN2ircpoqpD//bwZLahEeS7\n\ta3JQ2oR4KNrquZGeF+eC2PPYJV+b47NUSS7OuVPnZmcEYHMbueULXomxRgsf/a2U8H7516tPxmw\n\t2JiIHQFH2Lqt0A2so7Mo+kLKW5tDmzPRKcLcCrW1lvhuNevEO/PbfyjRqVZyqn+Rki28hFFkGpq\n\twI4HMpvIa9rM/Jt5o2gxzwsxad7R7ZUMlyxyQi8wd0hA==;\nContent-Type: multipart/alternative;\n\tboundary=\"eaaab4e84042d386b5c97e1fa4a8644fd0860d2dac0aa53aa738e551d60e\"\nMessage-ID: \u003c01a1d4dc4e3776e0a6f4357315417f62.nmdc64da@acme.test\u003e\nMIME-Version: 1.0\nSubject: Capture fbl-cap@sink.test\nTo: \u003cfbl-cap@sink.test\u003e\nFrom: Acme \u003cno-reply@acme.test\u003e\nDate: Fri, 13 Nov 2026 12:22:50 +0000\n\n--eaaab4e84042d386b5c97e1fa4a8644fd0860d2dac0aa53aa738e551d60e\nContent-Type: text/plain;\n\tcharset=\"us-ascii\"\nContent-Disposition: inline\n\nBonjour\n--eaaab4e84042d386b5c97e1fa4a8644fd0860d2dac0aa53aa738e551d60e\nContent-Type: text/html;\n\tcharset=\"us-ascii\"\nContent-Disposition: inline\n\n\u003cp\u003eBonjour\u003c/p\u003e\n--eaaab4e84042d386b5c97e1fa4a8644fd0860d2dac0aa53aa738e551d60e--\n\n",
+      "version": "1",
+      "reported_uri": {},
+      "reported_domain": {},
+      "original_rcpto_to": [
+        "fbl-cap@sink.test"
+      ],
+      "reporting_mta": {
+        "mta_type": "dns",
+        "name": "sink.test"
+      },
+      "original_mail_from": "b+01a1d4dc4e3776e0a6f4357315417f62.b6lfmxix@bounce.acme.test",
+      "feedback_type": "abuse",
+      "arrival_date": "2026-11-13T12:22:50Z"
+    },
+    "headers": {
+      "Message-ID": "\u003carf-1794572570689099470@sink.test\u003e"
+    },
+    "bounce_classification": "Uncategorized",
+    "reception_protocol": "ESMTP",
+    "session_id": "0f8ff6c7-a5e2-43fa-bc04-3e01c446cbfb",
+    "meta": {},
+    "id": "f181bf8bdf5c11f1968566ff4c2d792e",
+    "created": 1794572570,
+    "created_time": "2026-11-13T12:22:50.699354700Z",
+    "queue": "fbl.postier.test",
+    "peer_address": {
+      "addr": "10.89.0.5",
+      "name": "sink.test"
+    },
+    "site": "",
+    "nodeid": "16e621b5-94f9-4154-a769-6c3e3ac14a5b",
+    "sender": "",
+    "response": {
+      "content": "",
+      "code": 250
+    },
+    "recipient": "fbl@fbl.postier.test",
+    "timestamp": 1794572570
+  },
+  {
+    "size": 2293,
+    "num_attempts": 0,
+    "event_time": "2026-11-13T12:22:50.705601442Z",
+    "type": "Reception",
+    "peer_address": {
+      "addr": "10.89.0.5",
+      "name": "sink.test"
+    },
+    "headers": {
+      "Message-ID": "\u003cdsn-1794572570686145539@sink.test\u003e"
+    },
+    "bounce_classification": "Uncategorized",
+    "reception_protocol": "ESMTP",
+    "session_id": "9c81dcb8-b177-43aa-ad64-e931e6e1de64",
+    "meta": {},
+    "id": "f1826211df5c11f1968766ff4c2d792e",
+    "created": 1794572570,
+    "queue": "bounce.acme.test",
+    "created_time": "2026-11-13T12:22:50.703515300Z",
+    "site": "",
+    "response": {
+      "content": "",
+      "code": 250
+    },
+    "sender": "",
+    "nodeid": "16e621b5-94f9-4154-a769-6c3e3ac14a5b",
+    "recipient": "b+01a1d4dc4e1e76c18f5c8a5104f88ec7.zjqnhixg@bounce.acme.test",
+    "timestamp": 1794572570
+  },
+  {
+    "size": 0,
+    "num_attempts": 0,
+    "event_time": "2026-11-13T12:22:50Z",
+    "type": "OOB",
+    "peer_address": {
+      "addr": "10.89.0.5",
+      "name": "sink.test"
+    },
+    "headers": {
+      "Message-ID": "\u003cdsn-1794572570686145539@sink.test\u003e"
+    },
+    "bounce_classification": "InvalidRecipient",
+    "reception_protocol": "ESMTP",
+    "session_id": "9c81dcb8-b177-43aa-ad64-e931e6e1de64",
+    "meta": {},
+    "id": "f1826211df5c11f1968766ff4c2d792e",
+    "created": 1794572570,
+    "queue": "bounce.acme.test",
+    "created_time": "2026-11-13T12:22:50.703515300Z",
+    "site": "",
+    "response": {
+      "content": "5.1.1 The email account that you tried to reach does not exist",
+      "enhanced_code": {
+        "class": 5,
+        "subject": 1,
+        "detail": 1
+      },
+      "code": 550
+    },
+    "sender": "b+01a1d4dc4e1e76c18f5c8a5104f88ec7.zjqnhixg@bounce.acme.test",
+    "nodeid": "16e621b5-94f9-4154-a769-6c3e3ac14a5b",
+    "recipient": "oob-cap@sink.test",
+    "timestamp": 1794572570
+  },
+  {
+    "peer_address": {
+      "addr": "10.89.0.5",
+      "name": "smtpsink"
+    },
+    "nodeid": "16e621b5-94f9-4154-a769-6c3e3ac14a5b",
+    "size": 1278,
+    "reception_protocol": "HTTP",
+    "id": "f1330ba1df5c11f1967b66ff4c2d792e",
+    "headers": {
+      "Message-ID": "\u003c01a1d4dc4e0672a09148b0f57dd288f6.vgxgymt2@acme.test\u003e"
+    },
+    "created": 1794572570,
+    "egress_pool": "unspecified",
+    "session_id": "b657e466-71c2-4318-9615-217996e2ec09",
+    "event_time": "2026-11-13T12:22:56.208495511Z",
+    "timestamp": 1794572576,
+    "bounce_classification": "Uncategorized",
+    "created_time": "2026-11-13T12:22:50.183568100Z",
+    "egress_source": "unspecified",
+    "queue": "01a1d4d7-d931-79da-a687-88595865766b@sink.test",
+    "sender": "b+01a1d4dc4e0672a09148b0f57dd288f6.25qaat6j@bounce.acme.test",
+    "delivery_protocol": "ESMTP",
+    "meta": {
+      "x_postier_id": "01a1d4dc-4e06-72a0-9148-b0f57dd288f6",
+      "x_postier_trace": "6c91d6048222a78957f9b805507f3fb6",
+      "tenant": "01a1d4d7-d931-79da-a687-88595865766b"
+    },
+    "response": {
+      "content": "Try again later, closing connection",
+      "command": "RCPT TO:\u003c421@sink.test\u003e\r\n",
+      "code": 421,
+      "enhanced_code": {
+        "detail": 0,
+        "class": 4,
+        "subject": 7
+      }
+    },
+    "site": "unspecified-\u003emx_list:smtpsink@smtp_client",
+    "type": "TransientFailure",
+    "recipient": "421@sink.test",
+    "num_attempts": 1,
+    "source_address": {
+      "address": "10.89.0.8:39584"
+    }
+  },
+  {
+    "peer_address": {
+      "addr": "10.89.0.5",
+      "name": "smtpsink"
+    },
+    "nodeid": "16e621b5-94f9-4154-a769-6c3e3ac14a5b",
+    "size": 1292,
+    "reception_protocol": "HTTP",
+    "id": "f133779cdf5c11f1967e66ff4c2d792e",
+    "headers": {
+      "Message-ID": "\u003c01a1d4dc4dee7bf5ba626c8ceba0632c.4tbv2t42@acme.test\u003e"
+    },
+    "created": 1794572570,
+    "egress_pool": "unspecified",
+    "session_id": "b657e466-71c2-4318-9615-217996e2ec09",
+    "event_time": "2026-11-13T12:22:56.213693172Z",
+    "timestamp": 1794572576,
+    "bounce_classification": "Uncategorized",
+    "created_time": "2026-11-13T12:22:50.186332400Z",
+    "egress_source": "unspecified",
+    "queue": "01a1d4d7-d931-79da-a687-88595865766b@sink.test",
+    "sender": "b+01a1d4dc4dee7bf5ba626c8ceba0632c.ambxrvji@bounce.acme.test",
+    "delivery_protocol": "ESMTP",
+    "meta": {
+      "x_postier_id": "01a1d4dc-4dee-7bf5-ba62-6c8ceba0632c",
+      "x_postier_trace": "d5549ec478cfc18145f1cd1d3e7ae8ef",
+      "tenant": "01a1d4d7-d931-79da-a687-88595865766b"
+    },
+    "response": {
+      "content": "Temporary system problem, try again later",
+      "command": "RCPT TO:\u003cdefer2-cap@sink.test\u003e\r\n",
+      "code": 451,
+      "enhanced_code": {
+        "detail": 0,
+        "class": 4,
+        "subject": 3
+      }
+    },
+    "site": "unspecified-\u003emx_list:smtpsink@smtp_client",
+    "type": "TransientFailure",
+    "recipient": "defer2-cap@sink.test",
+    "num_attempts": 1,
+    "source_address": {
+      "address": "10.89.0.8:39584"
+    }
+  },
+  {
+    "bounce_classification": "Uncategorized",
+    "created": 1794572570,
+    "reception_protocol": "HTTP",
+    "event_time": "2026-11-13T12:23:08.236186066Z",
+    "session_id": "25486656-8d84-48cf-993a-bf146e4bfb3f",
+    "site": "unspecified-\u003emx_list:smtpsink@smtp_client",
+    "timestamp": 1794572588,
+    "response": {
+      "command": "RCPT TO:\u003c421@sink.test\u003e\r\n",
+      "code": 421,
+      "content": "Try again later, closing connection",
+      "enhanced_code": {
+        "subject": 7,
+        "class": 4,
+        "detail": 0
+      }
+    },
+    "headers": {
+      "Message-ID": "\u003c01a1d4dc4e0672a09148b0f57dd288f6.vgxgymt2@acme.test\u003e"
+    },
+    "delivery_protocol": "ESMTP",
+    "id": "f1330ba1df5c11f1967b66ff4c2d792e",
+    "source_address": {
+      "address": "10.89.0.8:35202"
+    },
+    "meta": {
+      "x_postier_trace": "6c91d6048222a78957f9b805507f3fb6",
+      "tenant": "01a1d4d7-d931-79da-a687-88595865766b",
+      "x_postier_id": "01a1d4dc-4e06-72a0-9148-b0f57dd288f6"
+    },
+    "sender": "b+01a1d4dc4e0672a09148b0f57dd288f6.25qaat6j@bounce.acme.test",
+    "egress_pool": "unspecified",
+    "type": "TransientFailure",
+    "size": 1278,
+    "queue": "01a1d4d7-d931-79da-a687-88595865766b@sink.test",
+    "nodeid": "16e621b5-94f9-4154-a769-6c3e3ac14a5b",
+    "num_attempts": 2,
+    "egress_source": "unspecified",
+    "peer_address": {
+      "addr": "10.89.0.5",
+      "name": "smtpsink"
+    },
+    "created_time": "2026-11-13T12:22:50.183568100Z",
+    "recipient": "421@sink.test"
+  },
+  {
+    "bounce_classification": "Uncategorized",
+    "created": 1794572570,
+    "reception_protocol": "HTTP",
+    "event_time": "2026-11-13T12:23:08.240085405Z",
+    "session_id": "25486656-8d84-48cf-993a-bf146e4bfb3f",
+    "site": "unspecified-\u003emx_list:smtpsink@smtp_client",
+    "timestamp": 1794572588,
+    "response": {
+      "command": ".\r\n",
+      "code": 250,
+      "content": "OK: queued",
+      "enhanced_code": {
+        "subject": 0,
+        "class": 2,
+        "detail": 0
+      }
+    },
+    "headers": {
+      "Message-ID": "\u003c01a1d4dc4dee7bf5ba626c8ceba0632c.4tbv2t42@acme.test\u003e"
+    },
+    "delivery_protocol": "ESMTP",
+    "id": "f133779cdf5c11f1967e66ff4c2d792e",
+    "source_address": {
+      "address": "10.89.0.8:35202"
+    },
+    "meta": {
+      "x_postier_trace": "d5549ec478cfc18145f1cd1d3e7ae8ef",
+      "tenant": "01a1d4d7-d931-79da-a687-88595865766b",
+      "x_postier_id": "01a1d4dc-4dee-7bf5-ba62-6c8ceba0632c"
+    },
+    "sender": "b+01a1d4dc4dee7bf5ba626c8ceba0632c.ambxrvji@bounce.acme.test",
+    "egress_pool": "unspecified",
+    "type": "Delivery",
+    "size": 1292,
+    "queue": "01a1d4d7-d931-79da-a687-88595865766b@sink.test",
+    "nodeid": "16e621b5-94f9-4154-a769-6c3e3ac14a5b",
+    "num_attempts": 2,
+    "egress_source": "unspecified",
+    "peer_address": {
+      "addr": "10.89.0.5",
+      "name": "smtpsink"
+    },
+    "created_time": "2026-11-13T12:22:50.186332400Z",
+    "recipient": "defer2-cap@sink.test"
+  },
+  {
+    "event_time": "2026-11-13T12:23:20.246284159Z",
+    "headers": {
+      "Message-ID": "\u003c01a1d4dc4e0672a09148b0f57dd288f6.vgxgymt2@acme.test\u003e"
+    },
+    "timestamp": 1794572600,
+    "egress_pool": "unspecified",
+    "created_time": "2026-11-13T12:22:50.183568100Z",
+    "meta": {
+      "x_postier_id": "01a1d4dc-4e06-72a0-9148-b0f57dd288f6",
+      "tenant": "01a1d4d7-d931-79da-a687-88595865766b",
+      "x_postier_trace": "6c91d6048222a78957f9b805507f3fb6"
+    },
+    "source_address": {
+      "address": "10.89.0.8:51142"
+    },
+    "egress_source": "unspecified",
+    "sender": "b+01a1d4dc4e0672a09148b0f57dd288f6.25qaat6j@bounce.acme.test",
+    "nodeid": "16e621b5-94f9-4154-a769-6c3e3ac14a5b",
+    "reception_protocol": "HTTP",
+    "num_attempts": 3,
+    "queue": "01a1d4d7-d931-79da-a687-88595865766b@sink.test",
+    "delivery_protocol": "ESMTP",
+    "id": "f1330ba1df5c11f1967b66ff4c2d792e",
+    "peer_address": {
+      "name": "smtpsink",
+      "addr": "10.89.0.5"
+    },
+    "recipient": "421@sink.test",
+    "response": {
+      "enhanced_code": {
+        "class": 4,
+        "detail": 0,
+        "subject": 7
+      },
+      "command": "RCPT TO:\u003c421@sink.test\u003e\r\n",
+      "code": 421,
+      "content": "Try again later, closing connection"
+    },
+    "session_id": "fa430ff3-49ee-4610-b83a-42716ca0dfa5",
+    "created": 1794572570,
+    "site": "unspecified-\u003emx_list:smtpsink@smtp_client",
+    "size": 1278,
+    "type": "TransientFailure",
+    "bounce_classification": "Uncategorized"
+  },
+  {
+    "peer_address": {
+      "name": "smtpsink",
+      "addr": "10.89.0.5"
+    },
+    "event_time": "2026-11-13T12:23:32.259867595Z",
+    "nodeid": "16e621b5-94f9-4154-a769-6c3e3ac14a5b",
+    "site": "unspecified-\u003emx_list:smtpsink@smtp_client",
+    "created_time": "2026-11-13T12:22:50.183568100Z",
+    "source_address": {
+      "address": "10.89.0.8:56928"
+    },
+    "egress_source": "unspecified",
+    "timestamp": 1794572612,
+    "session_id": "9fd4bd23-7a1f-46a1-9f54-8c0cb5d93761",
+    "bounce_classification": "Uncategorized",
+    "headers": {
+      "Message-ID": "\u003c01a1d4dc4e0672a09148b0f57dd288f6.vgxgymt2@acme.test\u003e"
+    },
+    "size": 1278,
+    "delivery_protocol": "ESMTP",
+    "id": "f1330ba1df5c11f1967b66ff4c2d792e",
+    "reception_protocol": "HTTP",
+    "meta": {
+      "x_postier_id": "01a1d4dc-4e06-72a0-9148-b0f57dd288f6",
+      "tenant": "01a1d4d7-d931-79da-a687-88595865766b",
+      "x_postier_trace": "6c91d6048222a78957f9b805507f3fb6"
+    },
+    "sender": "b+01a1d4dc4e0672a09148b0f57dd288f6.25qaat6j@bounce.acme.test",
+    "egress_pool": "unspecified",
+    "num_attempts": 4,
+    "created": 1794572570,
+    "recipient": "421@sink.test",
+    "type": "TransientFailure",
+    "response": {
+      "code": 421,
+      "command": "RCPT TO:\u003c421@sink.test\u003e\r\n",
+      "enhanced_code": {
+        "class": 4,
+        "subject": 7,
+        "detail": 0
+      },
+      "content": "Try again later, closing connection"
+    },
+    "queue": "01a1d4d7-d931-79da-a687-88595865766b@sink.test"
+  },
+  {
+    "headers": {
+      "Message-ID": "\u003c01a1d4dc4e0672a09148b0f57dd288f6.vgxgymt2@acme.test\u003e"
+    },
+    "session_id": "f368bde9-c957-48df-8b90-f78af56d9e89",
+    "size": 1278,
+    "num_attempts": 5,
+    "created_time": "2026-11-13T12:22:50.183568100Z",
+    "created": 1794572570,
+    "egress_pool": "unspecified",
+    "event_time": "2026-11-13T12:23:44.290983159Z",
+    "bounce_classification": "Uncategorized",
+    "source_address": {
+      "address": "10.89.0.8:39798"
+    },
+    "response": {
+      "enhanced_code": {
+        "class": 4,
+        "detail": 0,
+        "subject": 7
+      },
+      "code": 421,
+      "content": "Try again later, closing connection",
+      "command": "RCPT TO:\u003c421@sink.test\u003e\r\n"
+    },
+    "timestamp": 1794572624,
+    "delivery_protocol": "ESMTP",
+    "egress_source": "unspecified",
+    "peer_address": {
+      "name": "smtpsink",
+      "addr": "10.89.0.5"
+    },
+    "meta": {
+      "x_postier_trace": "6c91d6048222a78957f9b805507f3fb6",
+      "x_postier_id": "01a1d4dc-4e06-72a0-9148-b0f57dd288f6",
+      "tenant": "01a1d4d7-d931-79da-a687-88595865766b"
+    },
+    "nodeid": "16e621b5-94f9-4154-a769-6c3e3ac14a5b",
+    "type": "TransientFailure",
+    "id": "f1330ba1df5c11f1967b66ff4c2d792e",
+    "reception_protocol": "HTTP",
+    "recipient": "421@sink.test",
+    "queue": "01a1d4d7-d931-79da-a687-88595865766b@sink.test",
+    "site": "unspecified-\u003emx_list:smtpsink@smtp_client",
+    "sender": "b+01a1d4dc4e0672a09148b0f57dd288f6.25qaat6j@bounce.acme.test"
+  },
+  {
+    "headers": {
+      "Message-ID": "\u003c01a1d4dc4e0672a09148b0f57dd288f6.vgxgymt2@acme.test\u003e"
+    },
+    "size": 1278,
+    "num_attempts": 6,
+    "created_time": "2026-11-13T12:22:50.183568100Z",
+    "created": 1794572570,
+    "event_time": "2026-11-13T12:23:44.292518937Z",
+    "bounce_classification": "MessageExpired",
+    "response": {
+      "enhanced_code": {
+        "class": 5,
+        "detail": 7,
+        "subject": 4
+      },
+      "content": "Next delivery time would be 1m 4s 108ms 875us 796ns after creation, which exceeds max_age=1m",
+      "code": 551
+    },
+    "timestamp": 1794572624,
+    "site": "",
+    "recipient": "421@sink.test",
+    "meta": {
+      "x_postier_trace": "6c91d6048222a78957f9b805507f3fb6",
+      "x_postier_id": "01a1d4dc-4e06-72a0-9148-b0f57dd288f6",
+      "tenant": "01a1d4d7-d931-79da-a687-88595865766b"
+    },
+    "id": "f1330ba1df5c11f1967b66ff4c2d792e",
+    "nodeid": "16e621b5-94f9-4154-a769-6c3e3ac14a5b",
+    "reception_protocol": "HTTP",
+    "queue": "01a1d4d7-d931-79da-a687-88595865766b@sink.test",
+    "type": "Expiration",
+    "sender": "b+01a1d4dc4e0672a09148b0f57dd288f6.25qaat6j@bounce.acme.test"
+  },
+  {
+    "headers": {
+      "Message-ID": "\u003c01a1d4dd73fd787d906df84a9f01670e.5uwf44in@acme.test\u003e"
+    },
+    "size": 1298,
+    "queue": "01a1d4d7-d931-79da-a687-88595865766b@sink.test",
+    "response": {
+      "code": 250,
+      "content": ""
+    },
+    "type": "Reception",
+    "nodeid": "16e621b5-94f9-4154-a769-6c3e3ac14a5b",
+    "meta": {
+      "x_postier_trace": "c64dc14d35626981e84bb79509443c10",
+      "tenant": "01a1d4d7-d931-79da-a687-88595865766b",
+      "x_postier_id": "01a1d4dd-73fd-787d-906d-f84a9f01670e"
+    },
+    "timestamp": 1794572645,
+    "id": "1e06b5b8df5d11f1969366ff4c2d792e",
+    "bounce_classification": "Uncategorized",
+    "event_time": "2026-11-13T12:24:05.393111978Z",
+    "recipient": "defer99-admin@sink.test",
+    "created_time": "2026-11-13T12:24:05.390482400Z",
+    "peer_address": {
+      "addr": "10.89.0.12",
+      "name": ""
+    },
+    "reception_protocol": "HTTP",
+    "created": 1794572645,
+    "sender": "b+01a1d4dd73fd787d906df84a9f01670e.z2lttyej@bounce.acme.test",
+    "num_attempts": 0,
+    "site": ""
+  },
+  {
+    "headers": {
+      "Message-ID": "\u003c01a1d4dd73fd787d906df84a9f01670e.5uwf44in@acme.test\u003e"
+    },
+    "egress_source": "unspecified",
+    "size": 1298,
+    "queue": "01a1d4d7-d931-79da-a687-88595865766b@sink.test",
+    "response": {
+      "code": 451,
+      "command": "RCPT TO:\u003cdefer99-admin@sink.test\u003e\r\n",
+      "enhanced_code": {
+        "detail": 0,
+        "subject": 3,
+        "class": 4
+      },
+      "content": "Temporary system problem, try again later"
+    },
+    "type": "TransientFailure",
+    "delivery_protocol": "ESMTP",
+    "meta": {
+      "x_postier_trace": "c64dc14d35626981e84bb79509443c10",
+      "tenant": "01a1d4d7-d931-79da-a687-88595865766b",
+      "x_postier_id": "01a1d4dd-73fd-787d-906d-f84a9f01670e"
+    },
+    "timestamp": 1794572645,
+    "id": "1e06b5b8df5d11f1969366ff4c2d792e",
+    "bounce_classification": "Uncategorized",
+    "event_time": "2026-11-13T12:24:05.397467937Z",
+    "site": "unspecified-\u003emx_list:smtpsink@smtp_client",
+    "nodeid": "16e621b5-94f9-4154-a769-6c3e3ac14a5b",
+    "recipient": "defer99-admin@sink.test",
+    "reception_protocol": "HTTP",
+    "created_time": "2026-11-13T12:24:05.390482400Z",
+    "session_id": "33057d4c-0e5d-418f-be03-389e25a9ed46",
+    "peer_address": {
+      "addr": "10.89.0.5",
+      "name": "smtpsink"
+    },
+    "sender": "b+01a1d4dd73fd787d906df84a9f01670e.z2lttyej@bounce.acme.test",
+    "created": 1794572645,
+    "source_address": {
+      "address": "10.89.0.8:52020"
+    },
+    "num_attempts": 0,
+    "egress_pool": "unspecified"
+  },
+  {
+    "headers": {
+      "Message-ID": "\u003c01a1d4dd73fd787d906df84a9f01670e.5uwf44in@acme.test\u003e"
+    },
+    "size": 1298,
+    "queue": "01a1d4d7-d931-79da-a687-88595865766b@sink.test",
+    "response": {
+      "code": 551,
+      "enhanced_code": {
+        "detail": 1,
+        "subject": 7,
+        "class": 5
+      },
+      "content": "Administrator bounced with reason: capture: admin bounce"
+    },
+    "type": "AdminBounce",
+    "nodeid": "16e621b5-94f9-4154-a769-6c3e3ac14a5b",
+    "meta": {
+      "x_postier_trace": "c64dc14d35626981e84bb79509443c10",
+      "tenant": "01a1d4d7-d931-79da-a687-88595865766b",
+      "x_postier_id": "01a1d4dd-73fd-787d-906d-f84a9f01670e"
+    },
+    "timestamp": 1794572648,
+    "id": "1e06b5b8df5d11f1969366ff4c2d792e",
+    "bounce_classification": "AuthenticationFailed",
+    "event_time": "2026-11-13T12:24:08.707238054Z",
+    "site": "localhost",
+    "created_time": "2026-11-13T12:24:05.390482400Z",
+    "sender": "b+01a1d4dd73fd787d906df84a9f01670e.z2lttyej@bounce.acme.test",
+    "created": 1794572645,
+    "reception_protocol": "HTTP",
+    "num_attempts": 1,
+    "recipient": "defer99-admin@sink.test"
+  }
+]

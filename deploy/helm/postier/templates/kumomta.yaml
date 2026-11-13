@@ -1,0 +1,238 @@
+{{/*
+SPDX-FileCopyrightText: 2026 Nawer Kezal
+SPDX-License-Identifier: AGPL-3.0-only
+*/}}
+{{- $name := printf "%s-kumomta" (include "postier.fullname" .) }}
+{{- $fullname := include "postier.fullname" . }}
+{{- $smtpPort := include "postier.kumoSmtpPort" . }}
+{{- /* The data file read by the Lua policy: same format as
+internal/kumo.PolicyData, which is its definition. */ -}}
+{{- $domains := dict }}
+{{- $inbound := dict }}
+{{- range .Values.domains }}
+{{- $selector := .selector | default "pst1" }}
+{{- $_ := set $domains .domain (dict "selector" $selector "key_file" (printf "/opt/kumomta/etc/dkim/%s.%s.key" .domain $selector)) }}
+{{- $_ := set $inbound (.returnPathDomain | default (printf "bounce.%s" .domain)) true }}
+{{- end }}
+{{- with .Values.feedbackDomain }}
+{{- $_ := set $inbound . true }}
+{{- end }}
+{{- /* KumoMTA's resolver does not apply the pod's DNS search domains: a
+Service must be named in full, or its MX lookup finds nothing. */ -}}
+{{- $routes := deepCopy .Values.kumomta.routes }}
+{{- if and .Values.mailpit.enabled (not (hasKey $routes "*")) }}
+{{- $_ := set $routes "*" (dict
+  "host" (printf "%s-mailpit.%s.svc.%s." $fullname .Release.Namespace .Values.clusterDomain)
+  "port" 1025) }}
+{{- end }}
+{{- $data := dict
+  "version" 1
+  "hostname" .Values.kumomta.hostname
+  "listen" (dict "http" "0.0.0.0:8000" "smtp" (printf "0.0.0.0:%s" $smtpPort))
+  "log_hook" (dict
+    "url" (printf "http://%s-ingest.%s.svc:8081/v1/kumo/records" $fullname .Release.Namespace)
+    "batch_size" (int .Values.kumomta.logHook.batchSize))
+  "queue" (dict
+    "retry_interval" .Values.kumomta.queue.retryInterval
+    "max_retry_interval" .Values.kumomta.queue.maxRetryInterval
+    "max_age" .Values.kumomta.queue.maxAge)
+  "domains" $domains
+  "inbound_domains" $inbound
+  "routes" $routes }}
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ $name }}-policy
+  labels:
+    {{- include "postier.labels" . | nindent 4 }}
+data:
+  init.lua: |
+    {{- .Files.Get "files/init.lua" | nindent 4 }}
+---
+# Mounted as a directory, not with subPath: the kubelet then updates the
+# file in place and the policy picks it up at its next re-read. Adding a
+# sending domain never restarts the MTA.
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ $name }}-data
+  labels:
+    {{- include "postier.labels" . | nindent 4 }}
+data:
+  data.json: |
+    {{- $data | toPrettyJson | nindent 4 }}
+---
+# Injection API, for dispatch. Never exposed outside the namespace.
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ $name }}
+  labels:
+    {{- include "postier.labels" . | nindent 4 }}
+spec:
+  selector:
+    {{- include "postier.selector" (list . "kumomta") | nindent 4 }}
+  ports:
+    - name: http
+      port: 8000
+      targetPort: http
+{{- if and (not .Values.kumomta.hostNetwork) .Values.kumomta.inbound.service.enabled }}
+---
+# Inbound SMTP: asynchronous bounces and feedback loops. The MX of every
+# return-path domain points here.
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ $name }}-inbound
+  labels:
+    {{- include "postier.labels" . | nindent 4 }}
+  {{- with .Values.kumomta.inbound.service.annotations }}
+  annotations:
+    {{- toYaml . | nindent 4 }}
+  {{- end }}
+spec:
+  type: {{ .Values.kumomta.inbound.service.type }}
+  {{- if eq .Values.kumomta.inbound.service.type "LoadBalancer" }}
+  # Keeps the client IP, which bounce classification and abuse handling need.
+  externalTrafficPolicy: Local
+  {{- end }}
+  selector:
+    {{- include "postier.selector" (list . "kumomta") | nindent 4 }}
+  ports:
+    - name: smtp
+      port: 25
+      targetPort: smtp
+{{- end }}
+---
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: {{ $name }}
+  labels:
+    {{- include "postier.labels" . | nindent 4 }}
+    app.kubernetes.io/component: kumomta
+spec:
+  serviceName: {{ $name }}
+  # One node, one IP in phase 0. Scaling out needs shared throttles (v0.5).
+  replicas: 1
+  selector:
+    matchLabels:
+      {{- include "postier.selector" (list . "kumomta") | nindent 6 }}
+  template:
+    metadata:
+      labels:
+        {{- include "postier.labels" . | nindent 8 }}
+        app.kubernetes.io/component: kumomta
+      annotations:
+        # The policy is code: a change restarts the MTA. The data file is
+        # deliberately absent from this checksum.
+        checksum/policy: {{ .Files.Get "files/init.lua" | sha256sum }}
+    spec:
+      automountServiceAccountToken: false
+      {{- if .Values.kumomta.hostNetwork }}
+      hostNetwork: true
+      # Without this, a hostNetwork pod cannot resolve Service names.
+      dnsPolicy: ClusterFirstWithHostNet
+      {{- end }}
+      {{- with .Values.kumomta.nodeSelector }}
+      nodeSelector:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.kumomta.tolerations }}
+      tolerations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      # Lets KumoMTA flush its spool.
+      terminationGracePeriodSeconds: 60
+      securityContext:
+        # kumod drops to this user and must own its spool.
+        fsGroup: 999
+        seccompProfile:
+          type: RuntimeDefault
+      containers:
+        - name: kumomta
+          image: {{ .Values.kumomta.image }}
+          # The image starts as root, drops to the kumod user itself and
+          # keeps a single capability, NET_BIND_SERVICE. It needs the few
+          # below to do so, and nothing else.
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop: ["ALL"]
+              add:
+                - SETUID
+                - SETGID
+                - SETPCAP
+                - NET_BIND_SERVICE
+                - CHOWN
+                - DAC_OVERRIDE
+          env:
+            - name: POSTIER_KUMO_DATA_TTL
+              value: {{ .Values.kumomta.dataTTL | quote }}
+            {{- include "postier.secretEnv" (list . "POSTIER_KUMO_INJECT_PASSWORD" "kumo-inject-password") | nindent 12 }}
+            {{- include "postier.secretEnv" (list . "POSTIER_INGEST_TOKEN" "ingest-token") | nindent 12 }}
+          ports:
+            - name: http
+              containerPort: 8000
+            - name: smtp
+              containerPort: {{ $smtpPort }}
+          readinessProbe:
+            tcpSocket:
+              port: http
+            periodSeconds: 5
+          livenessProbe:
+            tcpSocket:
+              port: http
+            periodSeconds: 10
+            failureThreshold: 6
+          startupProbe:
+            tcpSocket:
+              port: http
+            periodSeconds: 2
+            failureThreshold: 60
+          resources:
+            {{- toYaml .Values.kumomta.resources | nindent 12 }}
+          volumeMounts:
+            - name: policy
+              mountPath: /opt/kumomta/etc/policy
+              readOnly: true
+            - name: data
+              mountPath: /opt/kumomta/etc/postier
+              readOnly: true
+            - name: dkim
+              mountPath: /opt/kumomta/etc/dkim
+              readOnly: true
+            - name: spool
+              mountPath: /var/spool/kumomta
+            - name: logs
+              mountPath: /var/log/kumomta
+      volumes:
+        - name: policy
+          configMap:
+            name: {{ $name }}-policy
+        - name: data
+          configMap:
+            name: {{ $name }}-data
+        - name: dkim
+          {{- if .Values.domains }}
+          secret:
+            secretName: {{ required "dkimSecretName is required when domains is set" .Values.dkimSecretName }}
+            # Readable by the kumod group (fsGroup), nobody else.
+            defaultMode: 0440
+          {{- else }}
+          emptyDir: {}
+          {{- end }}
+        - name: logs
+          emptyDir:
+            sizeLimit: 1Gi
+  volumeClaimTemplates:
+    - metadata:
+        name: spool
+      spec:
+        accessModes: ["ReadWriteOnce"]
+        {{- with .Values.kumomta.storage.storageClassName }}
+        storageClassName: {{ . }}
+        {{- end }}
+        resources:
+          requests:
+            storage: {{ .Values.kumomta.storage.size }}

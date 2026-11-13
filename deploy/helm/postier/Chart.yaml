@@ -1,0 +1,21 @@
+# SPDX-FileCopyrightText: 2026 Nawer Kezal
+# SPDX-License-Identifier: AGPL-3.0-only
+apiVersion: v2
+name: postier
+description: Kubernetes-native transactional email, built on KumoMTA
+type: application
+version: 0.0.1
+appVersion: "0.0.1"
+kubeVersion: ">=1.29.0-0"
+home: https://github.com/SeeMyPing/postier
+sources:
+  - https://github.com/SeeMyPing/postier
+keywords:
+  - email
+  - smtp
+  - kumomta
+  - transactional
+annotations:
+  # Phase 0: this chart deploys the roles itself. From v0.5 it will install
+  # the operator, and a PostierCluster resource will deploy the rest.
+  postier.dev/phase: "0"

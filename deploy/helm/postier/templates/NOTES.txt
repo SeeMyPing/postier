@@ -1,0 +1,36 @@
+Postier {{ .Chart.AppVersion }} is installing in namespace {{ .Release.Namespace }}.
+
+Wait for the roles:
+
+  kubectl -n {{ .Release.Namespace }} rollout status deploy/{{ include "postier.fullname" . }}-api
+
+{{- if .Values.seed.enabled }}
+
+Your API key, shown once, is in the logs of the seed job:
+
+  kubectl -n {{ .Release.Namespace }} logs job/{{ include "postier.fullname" . }}-seed
+{{- else }}
+
+Create a tenant, a sending domain and an API key:
+
+  kubectl -n {{ .Release.Namespace }} exec deploy/{{ include "postier.fullname" . }}-dispatch -- \
+    /postier seed --tenant acme --domain <your domain>
+{{- end }}
+
+Send an email:
+
+  kubectl -n {{ .Release.Namespace }} port-forward svc/{{ include "postier.fullname" . }}-api 8080:{{ .Values.api.service.port }}
+  curl -X POST http://localhost:8080/v1/emails \
+    -H "Authorization: Bearer $POSTIER_API_KEY" -H "Content-Type: application/json" \
+    -d '{"from":"hello@{{ (first .Values.domains | default (dict "domain" "your-domain")).domain }}","to":["you@example.org"],"subject":"Hello","text":"It works."}'
+{{- if .Values.mailpit.enabled }}
+
+Every message lands in Mailpit:
+
+  kubectl -n {{ .Release.Namespace }} port-forward svc/{{ include "postier.fullname" . }}-mailpit 8025:8025
+  open http://localhost:8025
+{{- end }}
+{{- if not .Values.domains }}
+
+No sending domain is configured: set `domains` and `dkimSecretName`.
+{{- end }}

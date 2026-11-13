@@ -1,0 +1,34 @@
+{
+  "headers": {
+    "Message-ID": "<01a1d4dd73fd787d906df84a9f01670e.5uwf44in@acme.test>"
+  },
+  "size": 1298,
+  "queue": "01a1d4d7-d931-79da-a687-88595865766b@sink.test",
+  "response": {
+    "code": 551,
+    "enhanced_code": {
+      "detail": 1,
+      "subject": 7,
+      "class": 5
+    },
+    "content": "Administrator bounced with reason: capture: admin bounce"
+  },
+  "type": "AdminBounce",
+  "nodeid": "16e621b5-94f9-4154-a769-6c3e3ac14a5b",
+  "meta": {
+    "x_postier_trace": "c64dc14d35626981e84bb79509443c10",
+    "tenant": "01a1d4d7-d931-79da-a687-88595865766b",
+    "x_postier_id": "01a1d4dd-73fd-787d-906d-f84a9f01670e"
+  },
+  "timestamp": 1794572648,
+  "id": "1e06b5b8df5d11f1969366ff4c2d792e",
+  "bounce_classification": "AuthenticationFailed",
+  "event_time": "2026-11-13T12:24:08.707238054Z",
+  "site": "localhost",
+  "created_time": "2026-11-13T12:24:05.390482400Z",
+  "sender": "b+01a1d4dd73fd787d906df84a9f01670e.z2lttyej@bounce.acme.test",
+  "created": 1794572645,
+  "reception_protocol": "HTTP",
+  "num_attempts": 1,
+  "recipient": "defer99-admin@sink.test"
+}

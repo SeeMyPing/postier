@@ -1,0 +1,62 @@
+{{/*
+SPDX-FileCopyrightText: 2026 Nawer Kezal
+SPDX-License-Identifier: AGPL-3.0-only
+*/}}
+{{- if .Values.mailpit.enabled }}
+{{- $name := printf "%s-mailpit" (include "postier.fullname" .) }}
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ $name }}
+  labels:
+    {{- include "postier.labels" . | nindent 4 }}
+    app.kubernetes.io/component: mailpit
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      {{- include "postier.selector" (list . "mailpit") | nindent 6 }}
+  template:
+    metadata:
+      labels:
+        {{- include "postier.labels" . | nindent 8 }}
+        app.kubernetes.io/component: mailpit
+    spec:
+      automountServiceAccountToken: false
+      containers:
+        - name: mailpit
+          image: {{ .Values.mailpit.image }}
+          securityContext:
+            allowPrivilegeEscalation: false
+            runAsNonRoot: true
+            runAsUser: 1000
+            capabilities:
+              drop: ["ALL"]
+            seccompProfile:
+              type: RuntimeDefault
+          ports:
+            - name: smtp
+              containerPort: 1025
+            - name: http
+              containerPort: 8025
+          readinessProbe:
+            tcpSocket:
+              port: smtp
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ $name }}
+  labels:
+    {{- include "postier.labels" . | nindent 4 }}
+spec:
+  selector:
+    {{- include "postier.selector" (list . "mailpit") | nindent 4 }}
+  ports:
+    - name: smtp
+      port: 1025
+      targetPort: smtp
+    - name: http
+      port: 8025
+      targetPort: http
+{{- end }}

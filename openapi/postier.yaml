@@ -1,0 +1,377 @@
+# SPDX-FileCopyrightText: 2026 Nawer Kezal
+# SPDX-License-Identifier: AGPL-3.0-only
+
+# The contract comes first: the server types and the SDKs are generated from
+# this file. It is written in OpenAPI 3.0.3 because code generators handle
+# 3.1 poorly (docs/implementation-plan.md §2.13).
+openapi: 3.0.3
+info:
+  title: Postier API
+  version: 0.0.1
+  description: |
+    Transactional email API.
+
+    A send creates **one message per recipient**. Each message has its own
+    identifier, status and history.
+
+    Every error uses RFC 9457 (`application/problem+json`) and carries a
+    stable `code` that clients can branch on.
+  license:
+    name: AGPL-3.0-only
+    url: https://www.gnu.org/licenses/agpl-3.0.html
+servers:
+  - url: http://localhost:8080
+    description: Local test bench
+security:
+  - apiKey: []
+tags:
+  - name: emails
+    description: Send email and follow each message
+
+paths:
+  /v1/emails:
+    post:
+      operationId: sendEmail
+      tags: [emails]
+      summary: Send an email
+      description: |
+        Accepts an email for 1 to 50 recipients. The `202` is only returned
+        once the messages are durably stored: an accepted message is never
+        lost, even if the MTA is down at that moment.
+      parameters:
+        - $ref: "#/components/parameters/IdempotencyKey"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/SendEmailRequest"
+            example:
+              from: Acme <no-reply@notifications.acme.fr>
+              to: [client@example.org]
+              subject: Votre commande 48213
+              html: "<p>Merci pour votre commande.</p>"
+              text: Merci pour votre commande.
+              tags: [order, confirmation]
+              metadata:
+                order_id: "48213"
+      responses:
+        "202":
+          description: Accepted and stored
+          headers:
+            Idempotent-Replayed:
+              description: "`true` when this is the stored response of an earlier request with the same Idempotency-Key."
+              schema:
+                type: string
+                enum: ["true"]
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SendEmailResponse"
+        "400":
+          $ref: "#/components/responses/Problem"
+        "401":
+          $ref: "#/components/responses/Problem"
+        "403":
+          $ref: "#/components/responses/Problem"
+        "409":
+          $ref: "#/components/responses/Problem"
+        "413":
+          $ref: "#/components/responses/Problem"
+        "422":
+          $ref: "#/components/responses/Problem"
+        default:
+          $ref: "#/components/responses/Problem"
+
+  /v1/emails/{id}:
+    get:
+      operationId: getEmail
+      tags: [emails]
+      summary: Current status of a message
+      parameters:
+        - $ref: "#/components/parameters/MessageId"
+      responses:
+        "200":
+          description: The message
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Email"
+        "401":
+          $ref: "#/components/responses/Problem"
+        "403":
+          $ref: "#/components/responses/Problem"
+        "404":
+          $ref: "#/components/responses/Problem"
+        default:
+          $ref: "#/components/responses/Problem"
+
+  /v1/emails/{id}/events:
+    get:
+      operationId: listEmailEvents
+      tags: [emails]
+      summary: Full history of a message
+      description: Events in chronological order. The status of a message is a projection of this list.
+      parameters:
+        - $ref: "#/components/parameters/MessageId"
+      responses:
+        "200":
+          description: The events
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/EventList"
+        "401":
+          $ref: "#/components/responses/Problem"
+        "403":
+          $ref: "#/components/responses/Problem"
+        "404":
+          $ref: "#/components/responses/Problem"
+        default:
+          $ref: "#/components/responses/Problem"
+
+components:
+  securitySchemes:
+    apiKey:
+      type: http
+      scheme: bearer
+      description: "`Authorization: Bearer pst_<env>_<prefix>_<secret>`"
+
+  parameters:
+    IdempotencyKey:
+      name: Idempotency-Key
+      in: header
+      required: false
+      description: |
+        Makes the request safe to retry. Kept 24 hours. Same key and same
+        body: the original response is replayed. Same key and a different
+        body: `409`.
+      schema:
+        type: string
+        maxLength: 255
+    MessageId:
+      name: id
+      in: path
+      required: true
+      schema:
+        type: string
+        format: uuid
+
+  responses:
+    Problem:
+      description: Error, in RFC 9457 format
+      content:
+        application/problem+json:
+          schema:
+            $ref: "#/components/schemas/Problem"
+
+  schemas:
+    SendEmailRequest:
+      type: object
+      required: [from, to, subject]
+      additionalProperties: false
+      properties:
+        from:
+          type: string
+          description: Sender, with an optional display name. Its domain must be a verified sending domain of the project.
+          example: Acme <no-reply@notifications.acme.fr>
+        to:
+          type: array
+          minItems: 1
+          maxItems: 50
+          items:
+            type: string
+          description: Recipients. Each one gets its own message.
+        reply_to:
+          type: array
+          maxItems: 5
+          items:
+            type: string
+        subject:
+          type: string
+          maxLength: 998
+        html:
+          type: string
+          description: HTML body. At least one of `html` and `text` is required.
+        text:
+          type: string
+          description: Plain text body. At least one of `html` and `text` is required.
+        headers:
+          type: object
+          description: Extra headers. Headers set by Postier (From, Message-ID, DKIM-Signature…) are refused.
+          additionalProperties:
+            type: string
+        tags:
+          type: array
+          maxItems: 10
+          items:
+            type: string
+            maxLength: 64
+        metadata:
+          type: object
+          description: Free key-value pairs, returned with the message and, later, in webhooks.
+          additionalProperties:
+            type: string
+
+    SendEmailResponse:
+      type: object
+      required: [batch_id, messages]
+      properties:
+        batch_id:
+          type: string
+          format: uuid
+          description: Identifier of the send, common to its messages.
+        messages:
+          type: array
+          items:
+            $ref: "#/components/schemas/AcceptedMessage"
+
+    AcceptedMessage:
+      type: object
+      required: [id, to, status]
+      properties:
+        id:
+          type: string
+          format: uuid
+        to:
+          type: string
+        status:
+          $ref: "#/components/schemas/Status"
+
+    Status:
+      type: string
+      description: |
+        Current status of a message. `delivered`, `bounced`, `complained`,
+        `expired`, `suppressed`, `rejected` and `canceled` are final, except
+        that a `delivered` message can still become `bounced` (asynchronous
+        bounce) or `complained`.
+      enum:
+        - accepted
+        - scheduled
+        - queued
+        - deferred
+        - delivered
+        - bounced
+        - complained
+        - expired
+        - suppressed
+        - rejected
+        - canceled
+
+    Email:
+      type: object
+      required: [id, batch_id, from, to, status, status_at, attempts, tags, metadata, created_at]
+      properties:
+        id:
+          type: string
+          format: uuid
+        batch_id:
+          type: string
+          format: uuid
+        from:
+          type: string
+        to:
+          type: string
+        subject:
+          type: string
+        status:
+          $ref: "#/components/schemas/Status"
+        status_at:
+          type: string
+          format: date-time
+          description: When the message reached its current status.
+        attempts:
+          type: integer
+          description: Delivery attempts made so far.
+        tags:
+          type: array
+          items:
+            type: string
+        metadata:
+          type: object
+          additionalProperties:
+            type: string
+        created_at:
+          type: string
+          format: date-time
+
+    EventList:
+      type: object
+      required: [data]
+      properties:
+        data:
+          type: array
+          items:
+            $ref: "#/components/schemas/Event"
+
+    Event:
+      type: object
+      required: [id, type, occurred_at]
+      properties:
+        id:
+          type: string
+          format: uuid
+        type:
+          type: string
+          enum:
+            - accepted
+            - queued
+            - deferred
+            - delivered
+            - bounced
+            - complained
+            - expired
+            - suppressed
+            - rejected
+            - canceled
+        occurred_at:
+          type: string
+          format: date-time
+        smtp_code:
+          type: integer
+          description: SMTP reply code of the remote server, when there is one.
+        enhanced_code:
+          type: string
+          description: Enhanced status code (RFC 3463), e.g. `5.1.1`.
+        bounce_class:
+          type: string
+          description: Classification of a failure, e.g. `InvalidRecipient`.
+        remote_mx:
+          type: string
+          description: Server that answered.
+        response:
+          type: string
+          description: Text of the remote server's reply.
+
+    Problem:
+      type: object
+      required: [type, title, status, code]
+      properties:
+        type:
+          type: string
+          description: URI identifying the kind of problem.
+        title:
+          type: string
+        status:
+          type: integer
+        detail:
+          type: string
+        code:
+          type: string
+          description: Stable machine-readable identifier.
+          enum:
+            - invalid_request
+            - unauthorized
+            - forbidden
+            - not_found
+            - domain_not_allowed
+            - domain_not_verified
+            - idempotency_conflict
+            - payload_too_large
+            - internal_error
+        field:
+          type: string
+          description: Request field at fault, when there is one.
+        trace_id:
+          type: string
+          description: To quote when asking for support.

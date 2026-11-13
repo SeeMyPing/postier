@@ -1,0 +1,158 @@
+# SPDX-FileCopyrightText: 2026 Nawer Kezal
+# SPDX-License-Identifier: AGPL-3.0-only
+
+# Local test bench: the whole pipeline on one machine, with no DNS and no
+# public IP. Nothing leaves it: every destination is routed to Mailpit, and
+# *@sink.test to smtpsink, which can refuse, defer and bounce on demand.
+#
+#   docker compose up --build        (or: podman compose up --build)
+#
+#   API       http://localhost:8080   key: POSTIER_SEED_API_KEY below
+#   Mailpit   http://localhost:8025   every delivered message
+#   smtpsink  http://localhost:8026/stats
+#
+# Every secret in this file is a public development value. Do not reuse.
+
+x-postier: &postier
+  image: postier:dev
+  build:
+    context: .
+    target: postier
+  restart: unless-stopped
+
+x-secrets:
+  signing-key: &signing-key "dev-signing-key-0123456789abcdef-not-secret"
+  ingest-token: &ingest-token "dev-ingest-token-not-secret"
+  inject-password: &inject-password "dev-inject-password-not-secret"
+  app-url: &app-url "postgres://postier_app:app-dev-password@postgres:5432/postier"
+  system-url: &system-url "postgres://postier_system:system-dev-password@postgres:5432/postier"
+
+services:
+  postgres:
+    image: docker.io/library/postgres:16-alpine
+    environment:
+      POSTGRES_USER: postier
+      POSTGRES_PASSWORD: owner-dev-password
+      POSTGRES_DB: postier
+    volumes:
+      - ./deploy/compose/postgres:/docker-entrypoint-initdb.d:ro
+      - pgdata:/var/lib/postgresql/data
+    ports:
+      - "127.0.0.1:5432:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postier -d postier"]
+      interval: 2s
+      timeout: 3s
+      retries: 30
+
+  migrate:
+    <<: *postier
+    restart: "no"
+    command: ["migrate"]
+    environment:
+      POSTIER_MIGRATE_DATABASE_URL: "postgres://postier:owner-dev-password@postgres:5432/postier"
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+  # Stands in for the operator: one tenant, one sending domain, one API key.
+  seed:
+    <<: *postier
+    restart: "no"
+    command: ["seed", "--tenant", "acme", "--domain", "acme.test"]
+    environment:
+      POSTIER_SYSTEM_DATABASE_URL: *system-url
+      POSTIER_SEED_API_KEY: "pst_test_siyd5ddj_E8h8Jtb0LlgMfGZXzBmgyeX5diTL9iQQraCQV9EDJbU"
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+
+  # The DKIM key of acme.test, generated once into a volume.
+  dkim-keygen:
+    <<: *postier
+    restart: "no"
+    user: "0"
+    command: ["dkim", "--domain", "acme.test", "--selector", "pst1",
+              "--out", "/dkim/acme.test.pst1.key", "--if-missing"]
+    volumes:
+      - dkim:/dkim
+
+  api:
+    <<: *postier
+    command: ["api"]
+    environment:
+      POSTIER_DATABASE_URL: *app-url
+    ports:
+      - "127.0.0.1:8080:8080"
+    depends_on:
+      seed:
+        condition: service_completed_successfully
+
+  dispatch:
+    <<: *postier
+    command: ["dispatch"]
+    environment:
+      POSTIER_SYSTEM_DATABASE_URL: *system-url
+      POSTIER_KUMO_URL: http://kumomta:8000
+      POSTIER_KUMO_INJECT_PASSWORD: *inject-password
+      POSTIER_SIGNING_KEY: *signing-key
+      POSTIER_GUARD_DELAY: 5s
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+
+  ingest:
+    <<: *postier
+    command: ["ingest"]
+    environment:
+      POSTIER_SYSTEM_DATABASE_URL: *system-url
+      POSTIER_INGEST_TOKEN: *ingest-token
+      POSTIER_SIGNING_KEY: *signing-key
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+
+  kumomta:
+    # Pinned: the Lua policy and the log record decoder are tested against
+    # this exact version. Bump it together with internal/kumo/testdata.
+    image: ghcr.io/kumocorp/kumomta:2026.09.29-b90d8bc1
+    restart: unless-stopped
+    environment:
+      POSTIER_KUMO_INJECT_PASSWORD: *inject-password
+      POSTIER_INGEST_TOKEN: *ingest-token
+      # The data file is re-read at most this often. 60 seconds by default.
+      POSTIER_KUMO_DATA_TTL: 5 seconds
+    volumes:
+      - ./kumo/policy:/opt/kumomta/etc/policy:ro
+      - ./deploy/compose/kumo:/opt/kumomta/etc/postier:ro
+      - dkim:/opt/kumomta/etc/dkim:ro
+      - spool:/var/spool/kumomta
+    depends_on:
+      dkim-keygen:
+        condition: service_completed_successfully
+
+  mailpit:
+    image: docker.io/axllent/mailpit:v1.33
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:8025:8025"
+
+  smtpsink:
+    image: postier-smtpsink:dev
+    build:
+      context: .
+      target: smtpsink
+    restart: unless-stopped
+    command:
+      - --hostname=sink.test
+      # Asynchronous bounces and complaints go back to KumoMTA's inbound
+      # listener, like a real provider would send them to the MX.
+      - --report-to=kumomta:2525
+      - --fbl-address=fbl@fbl.postier.test
+    ports:
+      - "127.0.0.1:8026:8025"
+
+volumes:
+  pgdata:
+  dkim:
+  spool:

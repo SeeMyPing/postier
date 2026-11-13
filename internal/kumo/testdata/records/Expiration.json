@@ -1,0 +1,34 @@
+{
+  "headers": {
+    "Message-ID": "<01a1d4dc4e0672a09148b0f57dd288f6.vgxgymt2@acme.test>"
+  },
+  "size": 1278,
+  "num_attempts": 6,
+  "created_time": "2026-11-13T12:22:50.183568100Z",
+  "created": 1794572570,
+  "event_time": "2026-11-13T12:23:44.292518937Z",
+  "bounce_classification": "MessageExpired",
+  "response": {
+    "enhanced_code": {
+      "class": 5,
+      "detail": 7,
+      "subject": 4
+    },
+    "content": "Next delivery time would be 1m 4s 108ms 875us 796ns after creation, which exceeds max_age=1m",
+    "code": 551
+  },
+  "timestamp": 1794572624,
+  "site": "",
+  "recipient": "421@sink.test",
+  "meta": {
+    "x_postier_trace": "6c91d6048222a78957f9b805507f3fb6",
+    "x_postier_id": "01a1d4dc-4e06-72a0-9148-b0f57dd288f6",
+    "tenant": "01a1d4d7-d931-79da-a687-88595865766b"
+  },
+  "id": "f1330ba1df5c11f1967b66ff4c2d792e",
+  "nodeid": "16e621b5-94f9-4154-a769-6c3e3ac14a5b",
+  "reception_protocol": "HTTP",
+  "queue": "01a1d4d7-d931-79da-a687-88595865766b@sink.test",
+  "type": "Expiration",
+  "sender": "b+01a1d4dc4e0672a09148b0f57dd288f6.25qaat6j@bounce.acme.test"
+}

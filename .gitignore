@@ -1,0 +1,10 @@
+# SPDX-FileCopyrightText: 2026 Nawer Kezal
+# SPDX-License-Identifier: AGPL-3.0-only
+
+/bin/
+/dist/
+/.quickstart/
+*.test
+*.out
+coverage.*
+.DS_Store

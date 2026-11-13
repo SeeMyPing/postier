@@ -1,0 +1,32 @@
+# SPDX-FileCopyrightText: 2026 Nawer Kezal
+# SPDX-License-Identifier: AGPL-3.0-only
+
+# Licensing of the files that cannot carry an SPDX header of their own.
+# Every other file of the server states "AGPL-3.0-only" in its first lines.
+# SDKs and examples, when they exist, will be under a permissive licence:
+# only the server is AGPL (docs/architecture.md, "Licence").
+
+version = 1
+
+[[annotations]]
+path = [
+  "go.mod",
+  "go.sum",
+  "README.md",
+  "docs/**",
+  "internal/store/sqlcgen/**",
+  "internal/httpapi/gen/api.gen.go",
+  "deploy/compose/kumo/data.json",
+  "deploy/helm/postier/templates/NOTES.txt",
+  "deploy/helm/postier/.helmignore",
+  ".dockerignore",
+]
+SPDX-FileCopyrightText = "2026 Nawer Kezal"
+SPDX-License-Identifier = "AGPL-3.0-only"
+
+# Log records captured from KumoMTA on the test bench, and the fuzzing corpus
+# derived from them: machine output, no creative content.
+[[annotations]]
+path = ["internal/kumo/testdata/**"]
+SPDX-FileCopyrightText = "2026 Nawer Kezal"
+SPDX-License-Identifier = "CC0-1.0"

@@ -1,0 +1,144 @@
+# SPDX-FileCopyrightText: 2026 Nawer Kezal
+# SPDX-License-Identifier: AGPL-3.0-only
+
+# Phase 0 chart: one tenant, one IP. It deploys the Postier roles, KumoMTA
+# and, optionally, a single-instance Postgres. See values-quickstart.yaml for
+# a kind-ready profile.
+
+image:
+  repository: ghcr.io/seemyping/postier
+  # Defaults to the chart's appVersion.
+  tag: ""
+  pullPolicy: IfNotPresent
+
+imagePullSecrets: []
+
+# Secrets Postier needs. Leave existingSecret empty and the chart generates
+# them once, then keeps them across upgrades. Set it to manage them yourself
+# (External Secrets, Vault…); the Secret must hold the keys listed in
+# templates/secret.yaml.
+secrets:
+  existingSecret: ""
+
+# Bundled Postgres: one instance, one volume, no backup. Good enough to try
+# Postier, not to run it: production points at CloudNativePG or a managed
+# database (postgres.enabled=false and secrets.existingSecret).
+#
+# `helm uninstall` keeps the volume but deletes the generated Secret. Before
+# reinstalling, delete the PersistentVolumeClaim too: the new passwords would
+# not match the roles stored in the old volume.
+postgres:
+  enabled: true
+  image: docker.io/library/postgres:16-alpine
+  storage:
+    size: 5Gi
+    storageClassName: ""
+  resources: {}
+
+api:
+  replicas: 2
+  service:
+    type: ClusterIP
+    port: 8080
+  resources: {}
+
+dispatch:
+  replicas: 2
+  # Messages injected in parallel by each replica.
+  concurrency: 32
+  # On a retry, how long to wait for the log record of the previous attempt
+  # before injecting again. Must exceed the latency of the log hook.
+  guardDelay: 15s
+  resources: {}
+
+ingest:
+  replicas: 2
+  resources: {}
+
+logLevel: info
+
+kumomta:
+  # Pinned: the Lua policy and the log record decoder are tested against
+  # this exact version.
+  image: ghcr.io/kumocorp/kumomta:2026.09.29-b90d8bc1
+  # Name announced in EHLO. Must match the PTR record of the sending IP.
+  hostname: mta.postier.example
+  # hostNetwork binds KumoMTA to the public IP of its node: the simple and
+  # reliable egress mode for one IP. Dedicate a node pool to it:
+  #   kubectl taint nodes <node> postier.dev/mta=true:NoSchedule
+  #   kubectl label nodes <node> postier.dev/mta=true
+  hostNetwork: true
+  nodeSelector:
+    postier.dev/mta: "true"
+  tolerations:
+    - key: postier.dev/mta
+      operator: Exists
+      effect: NoSchedule
+  # Inbound SMTP (asynchronous bounces, feedback loops). In hostNetwork mode
+  # KumoMTA listens on port 25 of the node. Otherwise it listens on 2525 and
+  # the Service below exposes 25.
+  inbound:
+    service:
+      # Only used when hostNetwork is false.
+      enabled: true
+      type: LoadBalancer
+      annotations: {}
+  # How often the policy re-reads its data file. A new sending domain is
+  # live after this delay plus the kubelet's ConfigMap sync (about a minute).
+  dataTTL: 60 seconds
+  storage:
+    size: 10Gi
+    storageClassName: ""
+  resources: {}
+  # Delivery queue timings.
+  queue:
+    retryInterval: 20 minutes
+    maxRetryInterval: 4 hours
+    maxAge: 3 days
+  logHook:
+    batchSize: 100
+  # Overrides MX resolution, by destination domain ("*" for all). Empty in
+  # production. A host inside the cluster must be a fully qualified name
+  # ending with a dot: KumoMTA does not use the pod's DNS search domains.
+  #   routes:
+  #     "example.org": { host: sink.test.svc.cluster.local., port: 2525 }
+  # With mailpit.enabled, a "*" route to Mailpit is added automatically.
+  routes: {}
+
+# Sending domains. Until the operator manages them (v0.1), each domain is
+# declared here and its DKIM key is created by hand:
+#
+#   postier dkim --domain notifications.acme.fr --selector pst1 --out acme.key
+#   kubectl create secret generic postier-dkim \
+#     --from-file=notifications.acme.fr.pst1.key=acme.key
+#
+# The key file in the Secret must be named <domain>.<selector>.key.
+domains: []
+#  - domain: notifications.acme.fr
+#    selector: pst1
+#    # Defaults to bounce.<domain>. Its MX must point at KumoMTA.
+#    returnPathDomain: bounce.notifications.acme.fr
+
+# Domain receiving ARF complaints from feedback loops, e.g. fbl.postier.example.
+feedbackDomain: ""
+
+# Name of the Secret holding the DKIM keys. Required as soon as domains is
+# not empty.
+dkimSecretName: postier-dkim
+
+# Phase 0 stand-in for the Tenant, SendingDomain and ApiCredential resources:
+# a Job that creates one tenant, registers `domains` as verified and issues
+# an API key, printed once in its logs.
+seed:
+  enabled: false
+  tenant: default
+
+# Mailpit, a mail catcher with a web UI. For the quickstart only.
+mailpit:
+  enabled: false
+  image: docker.io/axllent/mailpit:v1.33
+
+# DNS domain of the cluster, used to name Services in full.
+clusterDomain: cluster.local
+
+podAnnotations: {}

@@ -1,0 +1,53 @@
+# SPDX-FileCopyrightText: 2026 Nawer Kezal
+# SPDX-License-Identifier: AGPL-3.0-only
+version: "2"
+
+run:
+  timeout: 5m
+
+linters:
+  default: standard
+  enable:
+    - bodyclose
+    - errorlint
+    - gocritic
+    - gosec
+    - misspell
+    - nilerr
+    - noctx
+    - revive
+    - rowserrcheck
+    - sqlclosecheck
+    - unconvert
+    - unparam
+  settings:
+    gosec:
+      excludes:
+        # File paths come from flags set by the operator, not from requests.
+        - G304
+    revive:
+      rules:
+        - name: exported
+        - name: package-comments
+        - name: unused-parameter
+          disabled: true
+  exclusions:
+    generated: strict
+    rules:
+      # Tests build requests and read fixtures freely.
+      - path: _test\.go
+        linters: [gosec, noctx, bodyclose, unparam]
+      # Test tools, not shipped.
+      - path: ^test/
+        linters: [gosec, noctx]
+
+formatters:
+  enable:
+    - gofmt
+    - goimports
+  settings:
+    goimports:
+      local-prefixes:
+        - github.com/SeeMyPing/postier
+  exclusions:
+    generated: strict
