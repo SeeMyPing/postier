@@ -1,0 +1,103 @@
+# SPDX-FileCopyrightText: 2026 Nawer Kezal
+# SPDX-License-Identifier: AGPL-3.0-only
+name: Release
+
+# On-demand stable release: promotes the current main commit, already checked
+# and published as a `sha-*` snapshot by the Build workflow. Computes the next
+# version, creates the tag on that commit, then starts Build on the tag (it
+# publishes the GitHub release, the binaries, the chart and the image).
+#
+# Tags created with GITHUB_TOKEN do not trigger `push` workflows, but
+# `workflow_dispatch` events do, hence the explicit `gh workflow run`.
+#
+# Security:
+# - Only users with write access can dispatch a workflow.
+# - The `release` environment only allows the `main` branch.
+on:
+  workflow_dispatch:
+    inputs:
+      bump:
+        description: Version bump (ignored if "version" is set)
+        type: choice
+        options: [patch, minor, major]
+        default: patch
+      version:
+        description: Explicit version, e.g. v1.4.0 (optional)
+        type: string
+        required: false
+
+permissions: {}
+
+concurrency:
+  group: release
+  cancel-in-progress: false
+
+jobs:
+  release:
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    environment: release
+    permissions:
+      contents: write # create the tag
+      actions: write # read the Build runs, dispatch Build on the tag
+    env:
+      GH_TOKEN: ${{ github.token }}
+      GH_REPO: ${{ github.repository }}
+    steps:
+      - name: Build succeeded on this commit
+        run: |
+          runs=$(gh run list --workflow build.yml --branch main --event push --commit "$GITHUB_SHA" \
+            --status success --json databaseId --jq length)
+          if [ "$runs" -eq 0 ]; then
+            echo "::error::no successful Build run for main@${GITHUB_SHA::7}: wait for it to finish (or re-run it), then retry"
+            exit 1
+          fi
+
+      - name: Compute version
+        id: version
+        env:
+          BUMP: ${{ inputs.bump }}
+          VERSION: ${{ inputs.version }}
+        run: |
+          tags=$(gh api --paginate "repos/$GH_REPO/git/matching-refs/tags/v" --jq '.[].ref | ltrimstr("refs/tags/")')
+          latest=$(grep -E '^v[0-9]+\.[0-9]+\.[0-9]+$' <<< "$tags" | sort -V | tail -n1 || true)
+          latest=${latest:-v0.0.0}
+          if [ -n "$VERSION" ]; then
+            next=$VERSION
+          else
+            IFS=. read -r major minor patch <<< "${latest#v}"
+            case "$BUMP" in
+              major) next="v$((major + 1)).0.0" ;;
+              minor) next="v${major}.$((minor + 1)).0" ;;
+              patch) next="v${major}.${minor}.$((patch + 1))" ;;
+              *) echo "::error::invalid bump: $BUMP"; exit 1 ;;
+            esac
+          fi
+          if ! [[ "$next" =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+            echo "::error::invalid version '$next' (expected vMAJOR.MINOR.PATCH)"; exit 1
+          fi
+          if grep -qxF "$next" <<< "$tags"; then
+            echo "::error::tag $next already exists"; exit 1
+          fi
+          if [ "$(printf '%s\n%s\n' "$latest" "$next" | sort -V | tail -n1)" != "$next" ] || [ "$latest" = "$next" ]; then
+            echo "::error::$next is not greater than the latest release $latest"; exit 1
+          fi
+          echo "Latest: $latest → next: $next"
+          echo "tag=$next" >> "$GITHUB_OUTPUT"
+
+      - name: Create tag
+        env:
+          TAG: ${{ steps.version.outputs.tag }}
+        run: gh api "repos/$GH_REPO/git/refs" -f ref="refs/tags/$TAG" -f sha="$GITHUB_SHA"
+
+      - name: Start Build on the tag
+        env:
+          TAG: ${{ steps.version.outputs.tag }}
+        run: |
+          gh workflow run build.yml --ref "$TAG"
+          {
+            echo "### Release $TAG"
+            echo "Tag created on \`${GITHUB_SHA::7}\` (snapshot \`sha-${GITHUB_SHA::7}\`). Build started."
+            echo "- Release: $GITHUB_SERVER_URL/$GITHUB_REPOSITORY/releases/tag/$TAG (available once Build finishes)"
+          } >> "$GITHUB_STEP_SUMMARY"

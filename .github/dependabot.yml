@@ -1,0 +1,38 @@
+# SPDX-FileCopyrightText: 2026 Nawer Kezal
+# SPDX-License-Identifier: AGPL-3.0-only
+
+# Keeps the SHA-pinned actions, the Go modules and the Dockerfile base images
+# up to date. Every Dependabot PR goes through "PR tests" like any other PR:
+# its checks only run once a maintainer approves them.
+#
+# Not covered on purpose: the KumoMTA image (pinned in compose.yaml and the
+# chart, the log record decoder is tested against that exact version) and the
+# tools run with `go run …@version` in the Makefile.
+version: 2
+updates:
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
+    # Let a new release settle a few days before proposing it.
+    cooldown:
+      default-days: 7
+    groups:
+      actions:
+        patterns: ["*"]
+
+  - package-ecosystem: gomod
+    directory: /
+    schedule:
+      interval: weekly
+    cooldown:
+      default-days: 7
+    groups:
+      # Minor and patch updates in one PR; major updates get their own.
+      go-minor:
+        update-types: [minor, patch]
+
+  - package-ecosystem: docker
+    directory: /
+    schedule:
+      interval: weekly
