@@ -122,6 +122,20 @@ test/                smtpsink, test du jalon, capture des records de référence
 
 Le format des log records de KumoMTA est testé sur des records réels, capturés sur la version épinglée (`internal/kumo/testdata`). À chaque montée de version : relancer la capture avec `postier ingest --capture-dir`, puis `make capture DIR=…`, et relire le diff.
 
+### CI et releases
+
+- [`checks.yml`](.github/workflows/checks.yml) regroupe les vérifications : golangci-lint, code généré à jour, tests avec Postgres, fuzzing, govulncheck, REUSE, chart Helm, build de l'image.
+- [`pr.yml`](.github/workflows/pr.yml) lance ces vérifications sur les pull requests, une fois que le mainteneur a approuvé l'exécution (environnement `pr-tests`, avec relecteur obligatoire). Le code de la PR tourne sans secret, avec un jeton en lecture seule. Le job `ready` est le seul check exigé pour fusionner dans `main`.
+- [`build.yml`](.github/workflows/build.yml) tourne à chaque fusion dans `main` : vérifications, puis une pré-release `sha-<commit court>` avec les binaires, le chart packagé, `SHA256SUMS` et l'image `ghcr.io/seemyping/postier:sha-<commit court>` (et `:main`). Sur un tag `v*`, il publie la release stable et l'image `:X.Y.Z`, `:X.Y`, `:latest`.
+- [`release.yml`](.github/workflows/release.yml) publie une version stable à la demande, depuis `main`. Il vérifie que *Build* a réussi sur le commit, calcule la version suivante, crée le tag, puis lance *Build* sur ce tag.
+
+```bash
+gh workflow run release.yml -f bump=patch      # ou minor / major
+gh workflow run release.yml -f version=v1.0.0  # version explicite
+```
+
+Côté dépôt : `main` n'accepte que des PR dont le check `ready` est vert (ruleset *Protect main*). Les tags `v*` ne peuvent être ni déplacés ni supprimés (*Protect release tags*). Seules les actions GitHub, `docker/*`, `fsfe/reuse-action` et `azure/setup-helm` sont autorisées, épinglées par SHA. Dependabot met à jour chaque semaine les actions, les modules Go et les images du Dockerfile.
+
 ## Licence
 
 Le serveur est sous [AGPL-3.0-only](LICENSE). Chaque fichier porte son en-tête SPDX, vérifié par [REUSE](https://reuse.software) en CI. Les SDK et les exemples seront publiés sous licence permissive.

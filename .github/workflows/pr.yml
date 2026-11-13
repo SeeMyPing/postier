@@ -1,0 +1,62 @@
+# SPDX-FileCopyrightText: 2026 Nawer Kezal
+# SPDX-License-Identifier: AGPL-3.0-only
+name: PR tests
+
+# Runs the checks on pull requests, but only after a maintainer approves the run.
+#
+# Security model:
+# - `pull_request` (NEVER `pull_request_target`): PR code runs with a read-only
+#   token and no access to repository secrets, even for forks.
+# - The `approval` job targets the `pr-tests` environment, which has "Required
+#   reviewers" configured in Settings → Environments. Every run (including each
+#   new push to the PR) waits for an explicit approval before any PR code runs:
+#   the checks only start once `approval` has succeeded.
+# - Never add secrets or variables to the `pr-tests` environment: they would
+#   be readable by the PR code once approved.
+# - `ready` is the single required status check of the `main` ruleset: it fails
+#   unless the approval and every check succeeded.
+on:
+  pull_request:
+    branches: [main]
+
+permissions: {}
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+jobs:
+  approval:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    environment: pr-tests
+    permissions: {}
+    steps:
+      - name: Approved
+        env:
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+        run: echo "Run approved for $HEAD_SHA"
+
+  checks:
+    needs: approval
+    permissions:
+      contents: read
+    uses: ./.github/workflows/checks.yml
+
+  ready:
+    if: always()
+    needs: [approval, checks]
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions: {}
+    steps:
+      - name: Approval and checks succeeded
+        env:
+          RESULTS: ${{ join(needs.*.result, ' ') }}
+        run: |
+          for result in $RESULTS; do
+            if [ "$result" != success ]; then
+              echo "::error::approval or checks did not succeed: $RESULTS"
+              exit 1
+            fi
+          done

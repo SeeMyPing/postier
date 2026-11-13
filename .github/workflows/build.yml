@@ -1,0 +1,241 @@
+# SPDX-FileCopyrightText: 2026 Nawer Kezal
+# SPDX-License-Identifier: AGPL-3.0-only
+name: Build
+
+# Runs the checks, then builds and publishes a release:
+# - push to main (i.e. a merged PR): snapshot pre-release `sha-<short sha>`,
+#   image ghcr.io/seemyping/postier:sha-<short sha> and :main.
+# - `v*` tag (created by the Release workflow): stable release `vX.Y.Z`,
+#   image :X.Y.Z, :X.Y and :latest.
+# Each release carries the binaries, the packaged Helm chart and SHA256SUMS.
+# A manual run on another branch only runs the checks and the builds.
+#
+# No pull_request / pull_request_target triggers: this workflow never runs
+# third-party code. It only runs on pushes to the protected main branch, on
+# version tags, or manually (both require write access to the repo).
+on:
+  push:
+    branches: [main]
+    tags: ["v*"]
+  workflow_dispatch:
+
+# Deny everything by default; each job requests only what it needs.
+permissions: {}
+
+# Never cancel a running publication: a newer run waits for it.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: false
+
+env:
+  IMAGE: ghcr.io/seemyping/postier
+
+jobs:
+  meta:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions: {}
+    outputs:
+      version: ${{ steps.meta.outputs.version }}
+      app_version: ${{ steps.meta.outputs.app_version }}
+      chart_version: ${{ steps.meta.outputs.chart_version }}
+      prerelease: ${{ steps.meta.outputs.prerelease }}
+      publish: ${{ steps.meta.outputs.publish }}
+    steps:
+      - id: meta
+        run: |
+          short=${GITHUB_SHA::7}
+          case "$GITHUB_REF" in
+            refs/tags/v*)
+              version=$GITHUB_REF_NAME
+              if ! [[ "$version" =~ ^v[0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z.-]+)?$ ]]; then
+                echo "::error::invalid version tag '$version' (expected vMAJOR.MINOR.PATCH)"; exit 1
+              fi
+              app_version=${version#v}         # image tag published by metadata-action
+              chart_version=$app_version
+              if [[ "$version" == *-* ]]; then prerelease=true; else prerelease=false; fi
+              publish=true
+              ;;
+            refs/heads/main)
+              version=sha-$short
+              app_version=$version
+              chart_version=0.0.0-$version     # SemVer pre-release, below any stable chart
+              prerelease=true
+              publish=true
+              ;;
+            *)
+              version=dev-$short
+              app_version=$version
+              chart_version=0.0.0-$version
+              prerelease=true
+              publish=false
+              ;;
+          esac
+          {
+            echo "version=$version"
+            echo "app_version=$app_version"
+            echo "chart_version=$chart_version"
+            echo "prerelease=$prerelease"
+            echo "publish=$publish"
+          } >> "$GITHUB_OUTPUT"
+          echo "Version $version (chart $chart_version, pre-release: $prerelease, publish: $publish)"
+
+  checks:
+    permissions:
+      contents: read
+    uses: ./.github/workflows/checks.yml
+
+  binaries:
+    needs: [meta, checks]
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: read
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - { goos: linux, goarch: amd64 }
+          - { goos: linux, goarch: arm64 }
+          - { goos: darwin, goarch: arm64 }
+    env:
+      CGO_ENABLED: "0"
+      GOOS: ${{ matrix.goos }}
+      GOARCH: ${{ matrix.goarch }}
+      VERSION: ${{ needs.meta.outputs.version }}
+      BIN: postier-${{ matrix.goos }}-${{ matrix.goarch }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        with:
+          go-version-file: go.mod
+          cache: false
+      - name: Build
+        run: go build -trimpath -ldflags="-s -w -X main.version=$VERSION" -o "dist/$BIN" ./cmd/postier
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: ${{ env.BIN }}
+          path: dist/${{ env.BIN }}
+          if-no-files-found: error
+          retention-days: 7
+
+  chart:
+    needs: [meta, checks]
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: read
+    env:
+      APP_VERSION: ${{ needs.meta.outputs.app_version }}
+      CHART_VERSION: ${{ needs.meta.outputs.chart_version }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: azure/setup-helm@2f5e7bc67f1f9972ab16657bb795f36d8f04de0e # v5.1.0
+      # appVersion is the image tag the chart deploys by default.
+      - name: Package the chart
+        run: helm package deploy/helm/postier --version "$CHART_VERSION" --app-version "$APP_VERSION" --destination dist
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: chart
+          path: dist/postier-*.tgz
+          if-no-files-found: error
+          retention-days: 7
+
+  image:
+    needs: [meta, checks]
+    if: needs.meta.outputs.publish == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    permissions:
+      contents: read
+      packages: write # push to GHCR
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - uses: docker/setup-buildx-action@f87e5991a6d7451dcb8d9637bfbc97413f497069 # v4.4.1
+
+      - uses: docker/login-action@8aa5831fb8d48d8f76594c7ddde61ae58019f550 # v4.8.0
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ github.token }}
+
+      - id: meta
+        uses: docker/metadata-action@dc802804100637a589fabce1cb79ff13a1411302 # v6.2.0
+        with:
+          images: ${{ env.IMAGE }}
+          tags: |
+            type=ref,event=branch
+            type=sha,enable=${{ github.ref_type == 'branch' }}
+            type=semver,pattern={{version}}
+            type=semver,pattern={{major}}.{{minor}}
+
+      # The Dockerfile cross-compiles from the build platform: no QEMU needed.
+      - uses: docker/build-push-action@c3c9e263c25d99ce0380d002d59b67737d91b0dc # v7.4.0
+        with:
+          context: .
+          target: postier
+          platforms: linux/amd64,linux/arm64
+          build-args: VERSION=${{ needs.meta.outputs.version }}
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          provenance: mode=max
+          sbom: true
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+  release:
+    needs: [meta, binaries, chart, image]
+    if: needs.meta.outputs.publish == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: write # create the tag (snapshots) and the GitHub release
+    env:
+      GH_TOKEN: ${{ github.token }}
+      GH_REPO: ${{ github.repository }}
+      VERSION: ${{ needs.meta.outputs.version }}
+      APP_VERSION: ${{ needs.meta.outputs.app_version }}
+      PRERELEASE: ${{ needs.meta.outputs.prerelease }}
+    steps:
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          path: dist
+          merge-multiple: true
+
+      - name: Checksums
+        working-directory: dist
+        run: sha256sum postier-* > SHA256SUMS
+
+      - name: Create GitHub release
+        run: |
+          notes="Image: \`$IMAGE:$APP_VERSION\` (linux/amd64, linux/arm64)."
+          if [ "$GITHUB_REF_TYPE" = branch ]; then
+            # Snapshot of main: the tag is created on this commit by the release.
+            notes="Snapshot of \`main\` at $GITHUB_SHA. $notes"
+            if gh release view "$VERSION" > /dev/null 2>&1; then
+              gh release upload "$VERSION" dist/* --clobber
+            else
+              gh release create "$VERSION" dist/* --target "$GITHUB_SHA" \
+                --title "$VERSION" --notes "$notes" --prerelease --latest=false
+            fi
+          else
+            flags=(--latest)
+            [ "$PRERELEASE" = true ] && flags=(--prerelease --latest=false)
+            # Notes cover the changes since the previous stable version, not
+            # since the last sha-* snapshot.
+            previous=$(gh api --paginate "repos/$GH_REPO/git/matching-refs/tags/v" --jq '.[].ref | ltrimstr("refs/tags/")' \
+              | grep -E '^v[0-9]+\.[0-9]+\.[0-9]+$' | { cat; echo "$VERSION"; } | sort -uV \
+              | awk -v v="$VERSION" '$0 == v { print prev; exit } { prev = $0 }')
+            [ -n "$previous" ] && flags+=(--notes-start-tag "$previous")
+            gh release create "$VERSION" dist/* --verify-tag --title "$VERSION" \
+              --notes "$notes" --generate-notes "${flags[@]}"
+          fi
+          echo "### Release $VERSION: $GITHUB_SERVER_URL/$GITHUB_REPOSITORY/releases/tag/$VERSION" >> "$GITHUB_STEP_SUMMARY"
