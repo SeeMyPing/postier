@@ -188,6 +188,65 @@ end)
 -- Queues and delivery
 -------------------------------------------------------------------------------
 
+-- Outbound addresses. Without egress sources the kernel picks the source
+-- address of each connection, and may well pick IPv6 on a dual-stack host:
+-- SPF, reverse DNS and reputation are tied to specific addresses, so the
+-- choice must be explicit.
+--
+-- Sources are grouped into pools, used round robin. A destination domain can
+-- be sent through a given pool: mailbox providers judge address ranges
+-- differently, and an address one provider blocks may be fine with another.
+-- Without pools, every source forms the pool named DEFAULT_POOL.
+local DEFAULT_POOL = 'postier'
+
+local function egress()
+  return section 'egress'
+end
+
+local function egress_sources()
+  return egress().sources or {}
+end
+
+-- The pool a destination domain is sent through, or nil for none.
+local function pool_for(domain)
+  if #egress_sources() == 0 then
+    return nil
+  end
+  local e = egress()
+  return (e.domain_pools or {})[domain] or e.default_pool or DEFAULT_POOL
+end
+
+kumo.on('get_egress_source', function(source_name)
+  for _, src in ipairs(egress_sources()) do
+    if src.name == source_name then
+      return kumo.make_egress_source {
+        name = src.name,
+        source_address = src.address,
+        ehlo_domain = src.ehlo or load_data().hostname,
+      }
+    end
+  end
+  error('unknown egress source: ' .. source_name)
+end)
+
+kumo.on('get_egress_pool', function(pool_name)
+  local names = (egress().pools or {})[pool_name]
+  if not names and pool_name == DEFAULT_POOL then
+    names = {}
+    for _, src in ipairs(egress_sources()) do
+      table.insert(names, src.name)
+    end
+  end
+  if not names then
+    error('unknown egress pool: ' .. pool_name)
+  end
+  local entries = {}
+  for _, name in ipairs(names) do
+    table.insert(entries, { name = name })
+  end
+  return kumo.make_egress_pool { name = pool_name, entries = entries }
+end)
+
 -- A route overrides MX resolution for a destination domain ("*" for all).
 -- Production has none; the test bench and the quickstart send everything to
 -- a local sink.
@@ -224,6 +283,7 @@ kumo.on('get_queue_config', function(domain, tenant, campaign, routing_domain)
     max_retry_interval = queue.max_retry_interval or '4 hours',
     max_age = queue.max_age or '3 days',
   }
+  config.egress_pool = pool_for(domain)
   local route = route_for(domain)
   if route then
     config.protocol = { smtp = { mx_list = { route.host } } }
@@ -232,6 +292,9 @@ kumo.on('get_queue_config', function(domain, tenant, campaign, routing_domain)
 end)
 
 kumo.on('get_egress_path_config', function(domain, egress_source, site_name)
+  -- Without it, KumoMTA announces the machine's hostname, which in
+  -- hostNetwork mode is the node's: it would not match the PTR of the IP.
+  local ehlo = load_data().hostname
   if domain == HOOK_QUEUE then
     local hook = section 'log_hook'
     return kumo.make_egress_path {
@@ -244,6 +307,7 @@ kumo.on('get_egress_path_config', function(domain, egress_source, site_name)
   local route = route_for(domain)
   if route then
     return kumo.make_egress_path {
+      ehlo_domain = ehlo,
       smtp_port = route.port or 25,
       enable_tls = 'Disabled',
       connection_limit = route.connections or 10,
@@ -251,6 +315,7 @@ kumo.on('get_egress_path_config', function(domain, egress_source, site_name)
   end
 
   return kumo.make_egress_path {
+    ehlo_domain = ehlo,
     enable_tls = 'OpportunisticInsecure',
     enable_mta_sts = true,
     enable_dane = true,
