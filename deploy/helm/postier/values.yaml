@@ -83,6 +83,25 @@ kumomta:
       enabled: true
       type: LoadBalancer
       annotations: {}
+  # Addresses outbound mail leaves from. Leave sources empty and the kernel
+  # picks one per connection: on a dual-stack node that may be IPv6, which
+  # your SPF and reverse DNS must then cover too. Each address must be
+  # configured on the node, and its reverse DNS must match the EHLO name.
+  #
+  # Pools group sources; a destination domain can go through its own pool,
+  # since providers do not judge address ranges alike. Without pools, all
+  # sources form a single one.
+  #   egress:
+  #     sources:
+  #       - { name: ip4-1, address: 203.0.113.10 }
+  #       - { name: ip6-1, address: "2001:db8::10", ehlo: mta.postier.example }
+  #     pools:
+  #       v4: [ip4-1]
+  #       v6: [ip6-1]
+  #     default_pool: v4
+  #     domain_pools:
+  #       gmail.com: v6
+  egress: {}
   # How often the policy re-reads its data file. A new sending domain is
   # live after this delay plus the kubelet's ConfigMap sync (about a minute).
   dataTTL: 60 seconds

@@ -185,6 +185,12 @@ func TestPolicyDataValidate(t *testing.T) {
 		}
 	}
 	d := valid()
+	d.Egress = &Egress{
+		Sources:     []EgressSource{{Name: "ip4", Address: "192.0.2.1"}, {Name: "ip6", Address: "2001:db8::1"}},
+		Pools:       map[string][]string{"v4": {"ip4"}, "v6": {"ip6"}},
+		DefaultPool: "v4",
+		DomainPools: map[string]string{"gmail.com": "v6"},
+	}
 	if err := d.Validate(); err != nil {
 		t.Fatalf("valid data refused: %v", err)
 	}
@@ -196,6 +202,31 @@ func TestPolicyDataValidate(t *testing.T) {
 		"selector": func(d *PolicyData) { d.Domains["acme.example"] = DomainData{KeyFile: "/k"} },
 		"key file": func(d *PolicyData) { d.Domains["acme.example"] = DomainData{Selector: "s"} },
 		"route":    func(d *PolicyData) { d.Routes = map[string]Route{"*": {}} },
+		"egress ip": func(d *PolicyData) {
+			d.Egress = &Egress{Sources: []EgressSource{{Name: "a", Address: "not-an-ip"}}}
+		},
+		"egress pool member": func(d *PolicyData) {
+			d.Egress = &Egress{
+				Sources: []EgressSource{{Name: "a", Address: "192.0.2.1"}},
+				Pools:   map[string][]string{"v4": {"b"}},
+			}
+		},
+		"egress domain pool": func(d *PolicyData) {
+			d.Egress = &Egress{
+				Sources:     []EgressSource{{Name: "a", Address: "192.0.2.1"}},
+				DomainPools: map[string]string{"gmail.com": "v6"},
+			}
+		},
+		"egress default pool": func(d *PolicyData) {
+			d.Egress = &Egress{
+				Sources:     []EgressSource{{Name: "a", Address: "192.0.2.1"}},
+				Pools:       map[string][]string{"v4": {"a"}},
+				DefaultPool: "postier",
+			}
+		},
+		"egress dup": func(d *PolicyData) {
+			d.Egress = &Egress{Sources: []EgressSource{{Name: "a", Address: "192.0.2.1"}, {Name: "a", Address: "192.0.2.2"}}}
+		},
 	}
 	for name, breakIt := range broken {
 		d := valid()

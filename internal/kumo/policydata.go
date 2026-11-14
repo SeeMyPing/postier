@@ -6,6 +6,7 @@ package kumo
 import (
 	"encoding/json"
 	"fmt"
+	"net/netip"
 	"sort"
 )
 
@@ -20,6 +21,7 @@ type PolicyData struct {
 	Hostname string `json:"hostname"`
 
 	Listen  *Listen  `json:"listen,omitempty"`
+	Egress  *Egress  `json:"egress,omitempty"`
 	LogHook LogHook  `json:"log_hook"`
 	Queue   *Timings `json:"queue,omitempty"`
 
@@ -32,6 +34,33 @@ type PolicyData struct {
 	// Routes overrides MX resolution, by destination domain ("*" matches
 	// all). Empty in production.
 	Routes map[string]Route `json:"routes,omitempty"`
+}
+
+// Egress pins the addresses outbound mail leaves from. Without it, the
+// kernel chooses, and a dual-stack host may send over an IPv6 address that
+// SPF and reverse DNS do not cover. The future IPPool resource renders here.
+type Egress struct {
+	Sources []EgressSource `json:"sources"`
+	// Pools groups sources by name. Without it, all sources form one pool,
+	// "postier".
+	Pools map[string][]string `json:"pools,omitempty"`
+	// DefaultPool is used for every destination not in DomainPools.
+	DefaultPool string `json:"default_pool,omitempty"`
+	// DomainPools sends a destination domain through a given pool: mailbox
+	// providers do not judge address ranges alike.
+	DomainPools map[string]string `json:"domain_pools,omitempty"`
+}
+
+// DefaultEgressPool is the pool all sources form when no pool is declared.
+const DefaultEgressPool = "postier"
+
+// EgressSource is one sending address.
+type EgressSource struct {
+	Name    string `json:"name"`
+	Address string `json:"address"`
+	// EHLO defaults to the top-level hostname. It must match the reverse
+	// DNS of Address.
+	EHLO string `json:"ehlo,omitempty"`
 }
 
 // Listen holds the listener addresses. Changing them needs a restart.
@@ -98,6 +127,38 @@ func (d *PolicyData) Validate() error {
 		dom := d.Domains[name]
 		if dom.Selector == "" || dom.KeyFile == "" {
 			return fmt.Errorf("policy data: domain %s needs a selector and a key_file", name)
+		}
+	}
+	if d.Egress != nil {
+		seen := map[string]bool{}
+		for i, src := range d.Egress.Sources {
+			if src.Name == "" || seen[src.Name] {
+				return fmt.Errorf("policy data: egress source %d needs a unique name", i)
+			}
+			seen[src.Name] = true
+			if _, err := netip.ParseAddr(src.Address); err != nil {
+				return fmt.Errorf("policy data: egress source %s: %w", src.Name, err)
+			}
+		}
+		pools := map[string]bool{DefaultEgressPool: len(d.Egress.Pools) == 0}
+		for pool, members := range d.Egress.Pools {
+			if len(members) == 0 {
+				return fmt.Errorf("policy data: egress pool %s is empty", pool)
+			}
+			for _, m := range members {
+				if !seen[m] {
+					return fmt.Errorf("policy data: egress pool %s: unknown source %s", pool, m)
+				}
+			}
+			pools[pool] = true
+		}
+		if p := d.Egress.DefaultPool; p != "" && !pools[p] {
+			return fmt.Errorf("policy data: default egress pool %s is not declared", p)
+		}
+		for dom, p := range d.Egress.DomainPools {
+			if !pools[p] {
+				return fmt.Errorf("policy data: egress pool %s of %s is not declared", p, dom)
+			}
 		}
 	}
 	for name, r := range d.Routes {

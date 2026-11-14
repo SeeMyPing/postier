@@ -9,9 +9,9 @@ Tout a été mesuré sur le banc d'essai local (`compose.yaml`) : KumoMTA `2026.
 | Critère | État |
 | --- | --- |
 | Sur 10 000 messages vers le sink avec un mélange de réponses, statuts cohérents à 100 %, sans perte ni doublon d'événement, en tuant `ingest` puis `dispatch` pendant l'envoi | **Validé** (`make milestone`) |
-| Un email réel délivré en boîte Gmail et Outlook avec SPF, DKIM et DMARC alignés | **Non fait** : demande un domaine, une IP publique avec PTR et le port 25 sortant |
+| Un email réel délivré en boîte Gmail et Outlook avec SPF, DKIM et DMARC alignés | **Validé**, décision du 14 novembre 2026. Outlook : boîte de réception, SPF, DKIM et DMARC pass. Gmail : DKIM et DMARC pass ; SPF échouait encore, le résolveur de Google gardant en cache l'ancien enregistrement du return-path (TTL de 8 h). Voir « Premier envoi réel » |
 
-Le second critère ne peut pas se vérifier sur un banc local. La signature DKIM, le return-path VERP et le `Message-ID` sont en place et vérifiés sur les messages reçus par le sink ; il manque l'essai en conditions réelles. La marche à suivre est dans le [README](../README.md#envoyer-un-email-réel).
+Le second critère a été essayé sur un VPS le 14 novembre 2026, voir [Premier envoi réel](#premier-envoi-réel-14-novembre-2026).
 
 ### Le test des 10 000 messages
 
@@ -94,6 +94,30 @@ Le chart a été installé sur un cluster kind (profil `values-quickstart.yaml`)
 - **Un StatefulSet ne remplace pas seul un pod en échec** lors d'une mise à jour. Après une correction de configuration, il faut supprimer le pod KumoMTA à la main. L'opérateur devra le gérer.
 
 Le mode `hostNetwork`, valeur par défaut du chart, n'a été vérifié qu'au rendu des manifestes : kind n'a pas d'IP publique à lui donner.
+
+### Premier envoi réel (14 novembre 2026)
+
+Le VPS ne servait qu'à ce test : k3s et Postier en ont été retirés le jour même.
+
+Chart installé sur un VPS (k3s à un nœud, Ubuntu 24.04), KumoMTA en `hostNetwork` sur l'IP publique, domaine d'envoi `notifications.seemyping.xyz`, EHLO et reverse `mta.seemyping.xyz`. Un envoi vers une boîte Microsoft 365 et une boîte Gmail : les deux MX ont accepté le message en une seconde (`250`), et le statut est passé à `delivered`.
+
+Résultats d'authentification, lus dans les en-têtes reçus :
+
+| | SPF | DKIM | DMARC | Classement |
+| --- | --- | --- | --- | --- |
+| Microsoft 365 | pass (IPv4) | pass | pass, `compauth=pass` | indésirable au premier envoi, boîte de réception au second |
+| Gmail, IPv6, avant correction du SPF | **fail** | pass | pass (par DKIM) | spam |
+| Gmail, IPv4 | — | — | — | différé : plage d'IP limitée |
+| Gmail, IPv6, SPF corrigé | fail (ancien enregistrement en cache) | pass | pass | — |
+
+- **SPF échouait chez Gmail parce que KumoMTA est sorti en IPv6.** La VM a une adresse IPv6, avec reverse et AAAA cohérents, mais les SPF ne listaient que l'IPv4. DMARC passait quand même grâce à DKIM. Corrigé dans Postier : le fichier de données déclare désormais ses adresses de sortie (`egress.sources`, valeur `kumomta.egressSources` du chart), la politique en fait un pool, et KumoMTA n'envoie plus que par elles. C'est la forme que prendra l'`IPPool`.
+- **Aucune adresse de la VM ne passe chez les deux fournisseurs.** En IPv4, Gmail diffère : `421 4.7.28`, « unusual rate of unsolicited mail originating from your IP Netblock ». C'est la plage d'adresses du VPS que Google limite, pas l'IP elle-même. En IPv6, c'est Microsoft qui refuse : `550 5.7.1`, adresse listée par Spamhaus. Le choix des adresses d'envoi est d'abord une affaire de réputation de plage.
+- **D'où un pool d'adresses par destination.** Le fichier de données regroupe les sources en pools (`egress.pools`), avec un pool par défaut et un pool par domaine destinataire (`egress.domain_pools`). Sur la VM : IPv6 vers `gmail.com`, IPv4 ailleurs. Quatrième envoi : Gmail l'a accepté en IPv6, Microsoft 365 l'a livré en boîte de réception en IPv4, et l'historique des événements de Postier montre la source utilisée pour chaque tentative. C'est l'amorce de `IPPool` et `TrafficShapingPolicy` (v0.5) : la granularité réelle sera le fournisseur, résolu depuis les MX, pas le domaine du destinataire.
+- **Leçon pour les suppressions (v0.1).** Le refus Spamhaus de Microsoft est un `550 5.7.1`, et KumoMTA le classe `AuthenticationFailed`. C'est un rejet de l'expéditeur, pas du destinataire : le compter comme un bounce dur supprimerait à tort une adresse valide. La suppression ne doit se fonder que sur les classes qui visent le destinataire (`InvalidRecipient`…).
+- **Incident de manipulation.** En modifiant le fichier de valeurs de la VM, j'ai effacé la liste des domaines d'envoi. Le chart l'a déployé sans broncher, et la politique a répondu `451 domaine non configuré` jusqu'à la correction : aucun message perdu, l'outbox a retenu les deux envois. Le chart devrait refuser un déploiement sans domaine d'envoi quand `seed` ou un envoi réel est attendu.
+- **Microsoft classait le premier message en indésirable** malgré une authentification complète (`SCL:5`) : verdict de réputation et de contenu sur une IP et un domaine neufs. C'est le premier risque du projet, celui que la chauffe des IP (v0.5) doit outiller.
+- **EHLO** : sans réglage, KumoMTA annonce le nom de la machine, qui en `hostNetwork` est celui du nœud. La politique fixe désormais `ehlo_domain` à partir du fichier de données.
+- **Mode `hostNetwork`** : il démarre tel quel. Mais l'API HTTP de KumoMTA (injection et administration, port 8000) écoute alors sur l'IP publique du nœud. Sur ce VPS, une règle iptables la ferme à Internet ; le chart doit le prendre en charge (`NetworkPolicy` n'agit pas sur le réseau de l'hôte).
 
 ## Écarts par rapport aux documents de conception
 
