@@ -86,6 +86,9 @@ type Stats struct {
 	Duplicates int `json:"duplicates"`
 	Ignored    int `json:"ignored"`
 	Unverified int `json:"unverified"`
+	// Suppressed counts the addresses added to, or kept on, the suppression
+	// list because of this batch.
+	Suppressed int `json:"suppressed"`
 	// Invalid records could not be decoded. They are parked in
 	// kumo_dead_records, in the same transaction as the rest of the batch.
 	Invalid int `json:"invalid"`
@@ -195,9 +198,9 @@ func (s *Service) Process(ctx context.Context, records []kumo.Record, invalid []
 
 	// Counted apart and merged after the commit: a rolled back batch must
 	// not report inserts.
-	var inserted, duplicates, ignored int
+	var inserted, duplicates, ignored, suppressed int
 	err := s.pool.InTx(ctx, func(q *store.Queries, _ pgx.Tx) error {
-		inserted, duplicates, ignored = 0, 0, 0
+		inserted, duplicates, ignored, suppressed = 0, 0, 0, 0
 		for _, bad := range invalid {
 			s.log.ErrorContext(ctx, "undecodable record parked", "err", bad.Err)
 			if err := q.InsertDeadRecord(ctx, sqlcgen.InsertDeadRecordParams{
@@ -221,10 +224,22 @@ func (s *Service) Process(ctx context.Context, records []kumo.Record, invalid []
 			if err != nil {
 				return fmt.Errorf("record %s (%s): %w", p.rec.ID, p.rec.Type, err)
 			}
-			if res.Inserted {
-				inserted++
-			} else {
+			if !res.Inserted {
 				duplicates++
+				continue
+			}
+			inserted++
+			// Only for a new event: a record KumoMTA sends twice must not
+			// count as two soft bounces.
+			did, err := store.SuppressOnEvent(ctx, q, store.Recipient{
+				TenantID: ref.TenantID, ProjectID: ref.ProjectID, MessageID: p.messageID,
+				Addr: ref.RcptAddr, AddrHash: ref.RcptHash,
+			}, suppressionTrigger(p), p.occurredAt)
+			if err != nil {
+				return fmt.Errorf("record %s (%s): suppression: %w", p.rec.ID, p.rec.Type, err)
+			}
+			if did {
+				suppressed++
 			}
 		}
 		return nil
@@ -232,12 +247,13 @@ func (s *Service) Process(ctx context.Context, records []kumo.Record, invalid []
 	if err != nil {
 		return Stats{Received: stats.Received}, err
 	}
-	stats.Inserted, stats.Duplicates = inserted, duplicates
+	stats.Inserted, stats.Duplicates, stats.Suppressed = inserted, duplicates, suppressed
 	stats.Ignored += ignored
 
 	s.log.InfoContext(ctx, "batch ingested",
 		"received", stats.Received, "inserted", stats.Inserted, "duplicates", stats.Duplicates,
-		"ignored", stats.Ignored, "unverified", stats.Unverified, "invalid", stats.Invalid)
+		"ignored", stats.Ignored, "unverified", stats.Unverified, "invalid", stats.Invalid,
+		"suppressed", stats.Suppressed)
 	return stats, nil
 }
 

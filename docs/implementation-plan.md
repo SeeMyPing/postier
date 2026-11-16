@@ -241,9 +241,11 @@ Objectif : un envoi réel de bout en bout, et lever les inconnues de l'intégrat
 
 ---
 
-## 6. Décisions à trancher
+## 6. Décisions
 
-- **D1 — Templates** : API seule (dynamique, versionnée) ou CRD `EmailTemplate` (cohérent avec GitOps, mais limité à 1,5 Mo dans etcd et contraire à « les données dynamiques restent en base ») ? Recommandation : l'API, avec un import optionnel depuis Git en CLI.
-- **D2 — Projets** : une CRD `Project`, ou bien projet = namespace avec un tenant regroupant plusieurs namespaces ? Recommandation : une CRD `Project` dans le namespace du tenant, référencée par `SendingDomain` et `ApiCredential`.
-- **D3 — Stockage des corps** : Postgres seul jusqu'en v1, ou S3 dès le départ au-delà d'un seuil ? Recommandation : Postgres d'abord, derrière l'interface `BlobStore`.
-- **D4 — Garantie d'injection** : accepter officiellement une livraison au moins une fois, avec le garde-fou du point 2.6, en le documentant.
+Tranchées le 14 novembre 2026.
+
+- **D1 — Templates : par l'API.** Templates dynamiques et versionnés (`templates` + `template_versions` immuables), avec un import optionnel depuis Git en CLI. Pas de CRD `EmailTemplate` : elle serait limitée à 1,5 Mo dans etcd et contredirait « les données dynamiques restent en base ».
+- **D2 — Projets : une CRD `Project`**, dans le namespace du tenant, référencée par `SendingDomain` et `ApiCredential`. À poser avec les CRD de la v0.1.
+- **D3 — Stockage des corps : Postgres ou S3, selon la configuration.** Postgres reste le défaut, sans dépendance de plus. Un stockage objet compatible S3 se choisit à l'installation, pour ne pas faire passer de gros corps par le WAL répliqué. **État :** seul Postgres est implémenté ; le corps passe déjà par `store.EncodeContent` / `DecodeContent` et sa purge par un seul job, les deux points où S3 se branchera. Avec S3, l'écriture de l'objet précède le commit : un objet orphelin est possible et la purge doit le ramasser.
+- **D4 — Garantie d'injection : au moins une fois**, avec le garde-fou du point 2.6. Implémentée et documentée dans [validation-phase0.md](validation-phase0.md#garantie-dinjection-décision-d4).

@@ -90,10 +90,14 @@ image: ## Build the container image postier:dev
 
 .PHONY: chart-lint
 chart-lint: ## Lint and render the Helm chart with both profiles
-	helm lint deploy/helm/postier
+	helm lint deploy/helm/postier -f deploy/helm/postier/ci/production-values.yaml
 	helm lint deploy/helm/postier -f deploy/helm/postier/values-quickstart.yaml
-	helm template postier deploy/helm/postier >/dev/null
+	helm template postier deploy/helm/postier -f deploy/helm/postier/ci/production-values.yaml >/dev/null
 	helm template postier deploy/helm/postier -f deploy/helm/postier/values-quickstart.yaml >/dev/null
+	@# The defaults alone must be refused: no sending domain, and hostNetwork
+	@# without a restriction on who may inject.
+	@! helm template postier deploy/helm/postier >/dev/null 2>&1 || (echo "the chart rendered without a sending domain" && exit 1)
+	@! helm template postier deploy/helm/postier --set 'domains[0].domain=a.example' >/dev/null 2>&1 || (echo "hostNetwork rendered without injectAllowedCIDRs" && exit 1)
 
 .PHONY: quickstart
 quickstart: ## Postier on a local kind cluster, delivering to Mailpit

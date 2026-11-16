@@ -224,6 +224,7 @@ func TestPolicyDataValidate(t *testing.T) {
 				DefaultPool: "postier",
 			}
 		},
+		"inject cidr": func(d *PolicyData) { d.InjectAllowedCIDRs = []string{"10.42.0.0"} },
 		"egress dup": func(d *PolicyData) {
 			d.Egress = &Egress{Sources: []EgressSource{{Name: "a", Address: "192.0.2.1"}, {Name: "a", Address: "192.0.2.2"}}}
 		},

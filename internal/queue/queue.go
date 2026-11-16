@@ -65,6 +65,29 @@ func (PurgeIdempotencyArgs) InsertOpts() river.InsertOpts {
 	return river.InsertOpts{Queue: QueueMaintenance, MaxAttempts: 5}
 }
 
+// PurgeContentsArgs asks for the message bodies nothing needs any more to be
+// deleted.
+type PurgeContentsArgs struct{}
+
+// Kind implements river.JobArgs.
+func (PurgeContentsArgs) Kind() string { return "postier.purge_contents" }
+
+// InsertOpts implements river.JobArgsWithInsertOpts.
+func (PurgeContentsArgs) InsertOpts() river.InsertOpts {
+	return river.InsertOpts{Queue: QueueMaintenance, MaxAttempts: 3}
+}
+
+// PurgeSuppressionsArgs asks for expired suppressions to be deleted.
+type PurgeSuppressionsArgs struct{}
+
+// Kind implements river.JobArgs.
+func (PurgeSuppressionsArgs) Kind() string { return "postier.purge_suppressions" }
+
+// InsertOpts implements river.JobArgsWithInsertOpts.
+func (PurgeSuppressionsArgs) InsertOpts() river.InsertOpts {
+	return river.InsertOpts{Queue: QueueMaintenance, MaxAttempts: 3}
+}
+
 // Inserter enqueues jobs without working any. It is what the entry points
 // use, with the app pool.
 type Inserter struct {
@@ -117,6 +140,16 @@ func NewWorkerClient(pool *pgxpool.Pool, cfg WorkerConfig) (*river.Client[pgx.Tx
 			river.NewPeriodicJob(
 				river.PeriodicInterval(time.Hour),
 				func() (river.JobArgs, *river.InsertOpts) { return PurgeIdempotencyArgs{}, nil },
+				&river.PeriodicJobOpts{RunOnStart: true},
+			),
+			river.NewPeriodicJob(
+				river.PeriodicInterval(time.Minute),
+				func() (river.JobArgs, *river.InsertOpts) { return PurgeContentsArgs{}, nil },
+				&river.PeriodicJobOpts{RunOnStart: true},
+			),
+			river.NewPeriodicJob(
+				river.PeriodicInterval(time.Hour),
+				func() (river.JobArgs, *river.InsertOpts) { return PurgeSuppressionsArgs{}, nil },
 				&river.PeriodicJobOpts{RunOnStart: true},
 			),
 		},

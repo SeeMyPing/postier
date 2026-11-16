@@ -24,7 +24,7 @@ FROM messages
 WHERE id = $1 AND created_at = $2 AND project_id = $3;
 
 -- name: GetMessageForDispatch :one
-SELECT m.id, m.tenant_id, m.status, m.rcpt_addr, m.trace_id, m.created_at,
+SELECT m.id, m.tenant_id, m.project_id, m.status, m.rcpt_addr, m.rcpt_hash, m.trace_id, m.created_at,
        d.domain AS sending_domain, d.return_path_domain, d.verified_at AS domain_verified_at,
        c.encoding AS content_encoding, c.mime AS content_mime
 FROM messages m
@@ -46,7 +46,8 @@ WHERE id = sqlc.arg(id) AND created_at = sqlc.arg(created_at)
   AND (status = ANY(sqlc.arg(allowed_from)::text[]) OR status = sqlc.arg(status));
 
 -- name: GetMessageRef :one
-SELECT tenant_id, status FROM messages WHERE id = $1 AND created_at = $2;
+SELECT tenant_id, project_id, status, rcpt_addr, rcpt_hash
+FROM messages WHERE id = $1 AND created_at = $2;
 
 -- name: InsertEvent :execrows
 INSERT INTO events (
@@ -84,3 +85,29 @@ UPDATE messages
 SET attempts = sqlc.arg(attempts)::int
 WHERE id = sqlc.arg(id) AND created_at = sqlc.arg(created_at)
   AND attempts < sqlc.arg(attempts)::int;
+
+-- name: PurgeContents :many
+-- Deletes the bodies no message needs any more: every message of the send
+-- has reached a terminal status, so nothing will be injected or re-injected.
+-- A body is kept until then, not until injection: recovering from a lost
+-- KumoMTA spool needs it. Messages are detached first, in the same
+-- statement, so that none ever points at a body that is gone.
+WITH doomed AS (
+  SELECT c.id
+  FROM message_contents c
+  WHERE c.created_at < sqlc.arg(before)
+    AND NOT EXISTS (
+      SELECT 1 FROM messages m
+      WHERE m.content_id = c.id AND m.status <> ALL(sqlc.arg(terminal)::text[])
+    )
+  ORDER BY c.created_at
+  LIMIT sqlc.arg(batch)
+  FOR UPDATE OF c SKIP LOCKED
+), detached AS (
+  UPDATE messages SET content_id = NULL
+  WHERE content_id IN (SELECT id FROM doomed)
+  RETURNING 1
+)
+DELETE FROM message_contents
+WHERE id IN (SELECT id FROM doomed)
+RETURNING id;

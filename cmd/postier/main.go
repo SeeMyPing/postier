@@ -31,6 +31,7 @@ var commands = map[string]command{
 	"dispatch": {"inject accepted messages into KumoMTA", runDispatch},
 	"ingest":   {"receive KumoMTA log records and update message statuses", runIngest},
 	"migrate":  {"apply database migrations, partitions and grants", runMigrate},
+	"wait-db":  {"wait until the database is reachable and migrated", runWaitDB},
 	"seed":     {"create a tenant, a project, a sending domain and an API key (phase 0)", runSeed},
 	"dkim":     {"generate a DKIM key and print its DNS record", runDKIM},
 	"version":  {"print the version", runVersion},

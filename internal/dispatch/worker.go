@@ -91,6 +91,20 @@ func (w *InjectWorker) Work(ctx context.Context, job *river.Job[queue.InjectArgs
 	if msg.DomainVerifiedAt == nil {
 		return w.reject(ctx, id, createdAt, msg.TenantID, "sending domain is no longer verified", log)
 	}
+	// Then the suppression list: the address may have bounced, or its owner
+	// complained, between acceptance and now.
+	addr, err := domain.ParseAddress(msg.RcptAddr)
+	if err != nil {
+		return w.reject(ctx, id, createdAt, msg.TenantID, "stored recipient address is invalid", log)
+	}
+	suppressed, err := store.SuppressedAmong(ctx, q, msg.TenantID, msg.ProjectID, []domain.Address{addr})
+	if err != nil {
+		return err
+	}
+	if reason, ok := suppressed[addr.String()]; ok {
+		return w.close(ctx, id, createdAt, msg.TenantID, domain.EventSuppressed,
+			"recipient is suppressed: "+string(reason), log)
+	}
 	if msg.ContentMime == nil || msg.ContentEncoding == nil {
 		return w.reject(ctx, id, createdAt, msg.TenantID, "message body is no longer available", log)
 	}
@@ -159,16 +173,21 @@ func (w *InjectWorker) guardWait(job *river.Job[queue.InjectArgs]) time.Duration
 	return delay - w.now().Sub(last)
 }
 
-// reject closes a message that will never be injected. It always returns nil:
-// the job is done, even though the message is not sent.
+// reject closes a message that will never be injected.
 func (w *InjectWorker) reject(ctx context.Context, id uuid.UUID, createdAt time.Time, tenantID uuid.UUID, reason string, log *slog.Logger) error {
+	return w.close(ctx, id, createdAt, tenantID, domain.EventRejected, reason, log)
+}
+
+// close ends a message without injecting it, as rejected or as suppressed.
+// It always returns nil: the job is done, even though the message is not sent.
+func (w *InjectWorker) close(ctx context.Context, id uuid.UUID, createdAt time.Time, tenantID uuid.UUID, event domain.EventType, reason string, log *slog.Logger) error {
 	err := w.Pool.InTx(ctx, func(q *store.Queries, _ pgx.Tx) error {
 		_, err := store.AppendEvent(ctx, q, store.NewEvent{
 			MessageID: id, CreatedAt: createdAt, TenantID: tenantID,
-			Type:       domain.EventRejected,
+			Type:       event,
 			OccurredAt: w.now().UTC().Truncate(time.Microsecond),
-			// One rejection per message, however many times this runs.
-			DedupKey: "rejected:" + id.String(),
+			// Once per message, however many times this runs.
+			DedupKey: string(event) + ":" + id.String(),
 			Detail:   map[string]any{"response": reason},
 		})
 		return err
@@ -176,7 +195,7 @@ func (w *InjectWorker) reject(ctx context.Context, id uuid.UUID, createdAt time.
 	if err != nil {
 		return err
 	}
-	log.Warn("message rejected at injection", "reason", reason)
+	log.Warn("message closed at injection", "outcome", string(event), "reason", reason)
 	return nil
 }
 
@@ -225,11 +244,74 @@ func (w *PurgeIdempotencyWorker) Work(ctx context.Context, _ *river.Job[queue.Pu
 	return nil
 }
 
+// PurgeContentsWorker deletes the message bodies nothing needs any more.
+type PurgeContentsWorker struct {
+	river.WorkerDefaults[queue.PurgeContentsArgs]
+	Pool *store.SystemPool
+	Log  *slog.Logger
+	// Retention is how long a body is kept after its creation, even once
+	// every message of the send is closed. Zero: purge as soon as possible.
+	Retention time.Duration
+}
+
+const (
+	purgeBatch      = 500
+	purgeMaxBatches = 40 // per run: leave room for the next jobs
+)
+
+// Work implements river.Worker.
+func (w *PurgeContentsWorker) Work(ctx context.Context, _ *river.Job[queue.PurgeContentsArgs]) error {
+	terminal := make([]string, 0, 8)
+	for _, s := range domain.AllStatuses() {
+		if s.Terminal() {
+			terminal = append(terminal, string(s))
+		}
+	}
+	total := 0
+	for range purgeMaxBatches {
+		ids, err := w.Pool.Q().PurgeContents(ctx, sqlcgen.PurgeContentsParams{
+			Before: time.Now().Add(-w.Retention), Terminal: terminal, Batch: purgeBatch,
+		})
+		if err != nil {
+			return err
+		}
+		total += len(ids)
+		if len(ids) < purgeBatch {
+			break
+		}
+	}
+	if total > 0 {
+		w.Log.Info("message bodies purged", "count", total)
+	}
+	return nil
+}
+
+// PurgeSuppressionsWorker deletes the suppressions that have expired.
+type PurgeSuppressionsWorker struct {
+	river.WorkerDefaults[queue.PurgeSuppressionsArgs]
+	Pool *store.SystemPool
+	Log  *slog.Logger
+}
+
+// Work implements river.Worker.
+func (w *PurgeSuppressionsWorker) Work(ctx context.Context, _ *river.Job[queue.PurgeSuppressionsArgs]) error {
+	deleted, err := w.Pool.Q().DeleteExpiredSuppressions(ctx)
+	if err != nil {
+		return err
+	}
+	if deleted > 0 {
+		w.Log.Info("expired suppressions purged", "count", deleted)
+	}
+	return nil
+}
+
 // Workers registers every worker of the dispatch role.
-func Workers(inject *InjectWorker) *river.Workers {
+func Workers(inject *InjectWorker, contentRetention time.Duration) *river.Workers {
 	workers := river.NewWorkers()
 	river.AddWorker(workers, inject)
 	river.AddWorker(workers, &EnsurePartitionsWorker{Pool: inject.Pool, Log: inject.Log})
 	river.AddWorker(workers, &PurgeIdempotencyWorker{Pool: inject.Pool, Log: inject.Log})
+	river.AddWorker(workers, &PurgeContentsWorker{Pool: inject.Pool, Log: inject.Log, Retention: contentRetention})
+	river.AddWorker(workers, &PurgeSuppressionsWorker{Pool: inject.Pool, Log: inject.Log})
 	return workers
 }

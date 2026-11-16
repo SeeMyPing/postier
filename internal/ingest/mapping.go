@@ -177,3 +177,13 @@ func detail(rec *kumo.Record) map[string]any {
 	}
 	return d
 }
+
+// suppressionTrigger says what a record means for the address of its
+// recipient, from the classification KumoMTA gave to the response.
+func suppressionTrigger(p pending) domain.SuppressionTrigger {
+	feedback := ""
+	if p.rec.FeedbackReport != nil {
+		feedback = p.rec.FeedbackReport.FeedbackType
+	}
+	return domain.SuppressionFor(p.eventType, p.rec.BounceClassification, feedback)
+}

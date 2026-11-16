@@ -31,6 +31,11 @@ type PolicyData struct {
 	// for: every return-path domain, plus the feedback loop domain. It is a
 	// set, encoded as an object, because the policy looks domains up by key.
 	InboundDomains map[string]bool `json:"inbound_domains"`
+	// InjectAllowedCIDRs limits who may use the injection API, by source
+	// address, on top of its password. Empty means no restriction: fine when
+	// the listener is only reachable inside the cluster, not in hostNetwork
+	// mode, where it is bound to the node.
+	InjectAllowedCIDRs []string `json:"inject_allowed_cidrs,omitempty"`
 	// Routes overrides MX resolution, by destination domain ("*" matches
 	// all). Empty in production.
 	Routes map[string]Route `json:"routes,omitempty"`
@@ -159,6 +164,11 @@ func (d *PolicyData) Validate() error {
 			if !pools[p] {
 				return fmt.Errorf("policy data: egress pool %s of %s is not declared", p, dom)
 			}
+		}
+	}
+	for _, cidr := range d.InjectAllowedCIDRs {
+		if _, err := netip.ParsePrefix(cidr); err != nil {
+			return fmt.Errorf("policy data: inject_allowed_cidrs: %w", err)
 		}
 	}
 	for name, r := range d.Routes {

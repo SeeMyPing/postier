@@ -139,15 +139,28 @@ func (s *Service) Send(ctx context.Context, p Principal, req Request, opts Optio
 				"%s is not verified yet: check its DNS records", dom.Domain)
 		}
 
-		// 3. One body for the whole send, one message per recipient.
-		result = Result{BatchID: domain.NewIDAt(now)}
-		contentID := domain.NewIDAt(now)
-		if err := q.InsertContent(ctx, sqlcgen.InsertContentParams{
-			ID: contentID, TenantID: p.TenantID, CreatedAt: now,
-			Encoding: content.Encoding, Mime: content.Data, Sha256: content.SHA256,
-			SizeBytes: int32(content.Size), //nolint:gosec // bounded by MaxBodyBytes
-		}); err != nil {
+		// 3. Suppressed recipients. The request still succeeds: their
+		// message is created, already closed, so that the client sees why
+		// nothing was sent without having to handle an error.
+		suppressed, err := store.SuppressedAmong(ctx, q, p.TenantID, p.ProjectID, v.content.To)
+		if err != nil {
 			return err
+		}
+
+		// 4. One body for the whole send, one message per recipient. No body
+		// is stored when nobody is left to send to.
+		result = Result{BatchID: domain.NewIDAt(now)}
+		var contentRef *uuid.UUID
+		if len(suppressed) < len(v.content.To) {
+			contentID := domain.NewIDAt(now)
+			contentRef = &contentID
+			if err := q.InsertContent(ctx, sqlcgen.InsertContentParams{
+				ID: contentID, TenantID: p.TenantID, CreatedAt: now,
+				Encoding: content.Encoding, Mime: content.Data, Sha256: content.SHA256,
+				SizeBytes: int32(content.Size), //nolint:gosec // bounded by MaxBodyBytes
+			}); err != nil {
+				return err
+			}
 		}
 		metadata, err := json.Marshal(v.metadata)
 		if err != nil {
@@ -164,12 +177,17 @@ func (s *Service) Send(ctx context.Context, p Principal, req Request, opts Optio
 			}
 			hash := rcpt.Hash()
 			size := int32(content.Size) //nolint:gosec // bounded by MaxBodyBytes
+			reason, isSuppressed := suppressed[rcpt.String()]
+			status, msgContent := domain.StatusAccepted, contentRef
+			if isSuppressed {
+				status, msgContent = domain.StatusSuppressed, nil
+			}
 			if err := q.InsertMessage(ctx, sqlcgen.InsertMessageParams{
 				ID: id, TenantID: p.TenantID, ProjectID: p.ProjectID,
-				BatchID: result.BatchID, ContentID: &contentID, SendingDomainID: dom.ID,
+				BatchID: result.BatchID, ContentID: msgContent, SendingDomainID: dom.ID,
 				Source: opts.Source, FromAddr: v.content.From.Address.String(),
 				RcptAddr: rcpt.String(), RcptDomain: rcpt.Domain, RcptHash: hash[:],
-				Subject: &v.content.Subject, Status: string(domain.StatusAccepted),
+				Subject: &v.content.Subject, Status: string(status),
 				StatusAt: createdAt, Tags: v.tags, Metadata: metadata,
 				SizeBytes: &size, TraceID: nonEmpty(opts.TraceID), CreatedAt: createdAt,
 			}); err != nil {
@@ -182,15 +200,30 @@ func (s *Service) Send(ctx context.Context, p Principal, req Request, opts Optio
 			}); err != nil {
 				return err
 			}
+			result.Messages = append(result.Messages, Accepted{ID: id, To: rcpt.String(), Status: status})
+			if isSuppressed {
+				detail, err := json.Marshal(map[string]string{"response": "recipient is suppressed: " + string(reason)})
+				if err != nil {
+					return err
+				}
+				if _, err := q.InsertEvent(ctx, sqlcgen.InsertEventParams{
+					// One millisecond later, so that the history reads in order.
+					ID: domain.NewIDAt(createdAt.Add(time.Millisecond)), MessageID: id, TenantID: p.TenantID,
+					Type: string(domain.EventSuppressed), OccurredAt: createdAt.Add(time.Millisecond),
+					DedupKey: "suppressed:" + id.String(), Detail: detail,
+				}); err != nil {
+					return err
+				}
+				continue
+			}
 			ids = append(ids, id)
-			result.Messages = append(result.Messages, Accepted{
-				ID: id, To: rcpt.String(), Status: domain.StatusAccepted,
-			})
 		}
 
-		// 4. The outbox: the job commits with the messages, or not at all.
-		if err := s.jobs.EnqueueInjections(ctx, tx.Tx(), ids); err != nil {
-			return fmt.Errorf("enqueue injection: %w", err)
+		// 5. The outbox: the job commits with the messages, or not at all.
+		if len(ids) > 0 {
+			if err := s.jobs.EnqueueInjections(ctx, tx.Tx(), ids); err != nil {
+				return fmt.Errorf("enqueue injection: %w", err)
+			}
 		}
 
 		if opts.IdempotencyKey != "" {

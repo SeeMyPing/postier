@@ -6,6 +6,7 @@
 package gen
 
 import (
+	"errors"
 	"fmt"
 	"net/http"
 	"time"
@@ -13,6 +14,24 @@ import (
 	"github.com/oapi-codegen/runtime"
 	openapi_types "github.com/oapi-codegen/runtime/types"
 )
+
+// Defines values for AddSuppressionRequestScope.
+const (
+	AddSuppressionRequestScopeProject AddSuppressionRequestScope = "project"
+	AddSuppressionRequestScopeTenant  AddSuppressionRequestScope = "tenant"
+)
+
+// Valid indicates whether the value is a known member of the AddSuppressionRequestScope enum.
+func (e AddSuppressionRequestScope) Valid() bool {
+	switch e {
+	case AddSuppressionRequestScopeProject:
+		return true
+	case AddSuppressionRequestScopeTenant:
+		return true
+	default:
+		return false
+	}
+}
 
 // Defines values for EventType.
 const (
@@ -140,6 +159,48 @@ func (e Status) Valid() bool {
 	}
 }
 
+// Defines values for SuppressionReason.
+const (
+	Complaint   SuppressionReason = "complaint"
+	HardBounce  SuppressionReason = "hard_bounce"
+	Manual      SuppressionReason = "manual"
+	SoftBounces SuppressionReason = "soft_bounces"
+)
+
+// Valid indicates whether the value is a known member of the SuppressionReason enum.
+func (e SuppressionReason) Valid() bool {
+	switch e {
+	case Complaint:
+		return true
+	case HardBounce:
+		return true
+	case Manual:
+		return true
+	case SoftBounces:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for SuppressionScope.
+const (
+	SuppressionScopeProject SuppressionScope = "project"
+	SuppressionScopeTenant  SuppressionScope = "tenant"
+)
+
+// Valid indicates whether the value is a known member of the SuppressionScope enum.
+func (e SuppressionScope) Valid() bool {
+	switch e {
+	case SuppressionScopeProject:
+		return true
+	case SuppressionScopeTenant:
+		return true
+	default:
+		return false
+	}
+}
+
 // AcceptedMessage defines model for AcceptedMessage.
 type AcceptedMessage struct {
 	Id openapi_types.UUID `json:"id"`
@@ -151,6 +212,20 @@ type AcceptedMessage struct {
 	Status Status `json:"status"`
 	To     string `json:"to"`
 }
+
+// AddSuppressionRequest defines model for AddSuppressionRequest.
+type AddSuppressionRequest struct {
+	Address string `json:"address"`
+
+	// ExpiresAt Omit for a permanent suppression.
+	ExpiresAt *time.Time `json:"expires_at,omitempty"`
+
+	// Scope `tenant` requires the `admin` scope.
+	Scope *AddSuppressionRequestScope `json:"scope,omitempty"`
+}
+
+// AddSuppressionRequestScope `tenant` requires the `admin` scope.
+type AddSuppressionRequestScope string
 
 // Email defines model for Email.
 type Email struct {
@@ -264,6 +339,41 @@ type SendEmailResponse struct {
 // bounce) or `complained`.
 type Status string
 
+// Suppression defines model for Suppression.
+type Suppression struct {
+	// Address Absent once the recipient asked for erasure. The suppression still applies.
+	Address   *string   `json:"address,omitempty"`
+	CreatedAt time.Time `json:"created_at"`
+
+	// ExpiresAt Absent for a permanent suppression.
+	ExpiresAt *time.Time         `json:"expires_at,omitempty"`
+	Id        openapi_types.UUID `json:"id"`
+
+	// Reason `hard_bounce`: the mailbox does not exist. `complaint`: the
+	// recipient reported the message as spam. `soft_bounces`: repeated
+	// temporary failures. `manual`: added through this API.
+	Reason SuppressionReason `json:"reason"`
+
+	// Scope `project`, or `tenant` when it applies to every project.
+	Scope SuppressionScope `json:"scope"`
+}
+
+// SuppressionReason `hard_bounce`: the mailbox does not exist. `complaint`: the
+// recipient reported the message as spam. `soft_bounces`: repeated
+// temporary failures. `manual`: added through this API.
+type SuppressionReason string
+
+// SuppressionScope `project`, or `tenant` when it applies to every project.
+type SuppressionScope string
+
+// SuppressionList defines model for SuppressionList.
+type SuppressionList struct {
+	Data []Suppression `json:"data"`
+
+	// NextCursor Present when there is a next page.
+	NextCursor *openapi_types.UUID `json:"next_cursor,omitempty"`
+}
+
 // IdempotencyKey defines model for IdempotencyKey.
 type IdempotencyKey = string
 
@@ -278,8 +388,21 @@ type SendEmailParams struct {
 	IdempotencyKey *IdempotencyKey `json:"Idempotency-Key,omitempty"`
 }
 
+// ListSuppressionsParams defines parameters for ListSuppressions.
+type ListSuppressionsParams struct {
+	// Address Only the suppressions of this address.
+	Address *string `form:"address,omitempty" json:"address,omitempty"`
+
+	// Cursor The `next_cursor` of the previous page.
+	Cursor *openapi_types.UUID `form:"cursor,omitempty" json:"cursor,omitempty"`
+	Limit  *int                `form:"limit,omitempty" json:"limit,omitempty"`
+}
+
 // SendEmailJSONRequestBody defines body for SendEmail for application/json ContentType.
 type SendEmailJSONRequestBody = SendEmailRequest
+
+// AddSuppressionJSONRequestBody defines body for AddSuppression for application/json ContentType.
+type AddSuppressionJSONRequestBody = AddSuppressionRequest
 
 // ServerInterface represents all server handlers.
 type ServerInterface interface {
@@ -292,6 +415,15 @@ type ServerInterface interface {
 	// ListEmailEvents Full history of a message
 	// (GET /v1/emails/{id}/events)
 	ListEmailEvents(w http.ResponseWriter, r *http.Request, id MessageId)
+	// ListSuppressions List suppressed addresses
+	// (GET /v1/suppressions)
+	ListSuppressions(w http.ResponseWriter, r *http.Request, params ListSuppressionsParams)
+	// AddSuppression Suppress an address
+	// (POST /v1/suppressions)
+	AddSuppression(w http.ResponseWriter, r *http.Request)
+	// RemoveSuppression Lift a suppression
+	// (DELETE /v1/suppressions/{id})
+	RemoveSuppression(w http.ResponseWriter, r *http.Request, id openapi_types.UUID)
 }
 
 // ServerInterfaceWrapper converts contexts to parameters.
@@ -387,6 +519,105 @@ func (siw *ServerInterfaceWrapper) ListEmailEvents(w http.ResponseWriter, r *htt
 
 	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		siw.Handler.ListEmailEvents(w, r, id)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// ListSuppressions operation middleware
+func (siw *ServerInterfaceWrapper) ListSuppressions(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// Parameter object where we will unmarshal all parameters from the context
+	var params ListSuppressionsParams
+
+	// ------------- Optional query parameter "address" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "address", r.URL.Query(), &params.Address, runtime.BindQueryParameterOptions{Type: "string", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "address"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "address", Err: err})
+		}
+		return
+	}
+
+	// ------------- Optional query parameter "cursor" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "cursor", r.URL.Query(), &params.Cursor, runtime.BindQueryParameterOptions{Type: "string", Format: "uuid"})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "cursor"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "cursor", Err: err})
+		}
+		return
+	}
+
+	// ------------- Optional query parameter "limit" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "limit", r.URL.Query(), &params.Limit, runtime.BindQueryParameterOptions{Type: "integer", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "limit"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "limit", Err: err})
+		}
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.ListSuppressions(w, r, params)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// AddSuppression operation middleware
+func (siw *ServerInterfaceWrapper) AddSuppression(w http.ResponseWriter, r *http.Request) {
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.AddSuppression(w, r)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// RemoveSuppression operation middleware
+func (siw *ServerInterfaceWrapper) RemoveSuppression(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "id" -------------
+	var id openapi_types.UUID
+
+	err = runtime.BindStyledParameterWithOptions("simple", "id", r.PathValue("id"), &id, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "uuid", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "id", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.RemoveSuppression(w, r, id)
 	}))
 
 	for _, middleware := range siw.HandlerMiddlewares {
@@ -519,6 +750,9 @@ func HandlerWithOptions(si ServerInterface, options StdHTTPServerOptions) http.H
 	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/v1/emails", wrapper.SendEmail)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/v1/emails/{id}", wrapper.GetEmail)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/v1/emails/{id}/events", wrapper.ListEmailEvents)
+	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/v1/suppressions", wrapper.ListSuppressions)
+	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/v1/suppressions", wrapper.AddSuppression)
+	m.HandleFunc(http.MethodDelete+" "+options.BaseURL+"/v1/suppressions/{id}", wrapper.RemoveSuppression)
 
 	return m
 }

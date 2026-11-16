@@ -28,6 +28,9 @@ kumomta:
   nodeSelector:
     postier.dev/mta: null
   tolerations: []
+  # Not required without hostNetwork, but set so that the quickstart
+  # exercises the check. This is the pod network of a default kind cluster.
+  injectAllowedCIDRs: ["10.244.0.0/16"]
   inbound:
     service:
       type: ClusterIP

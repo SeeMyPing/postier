@@ -15,8 +15,12 @@ GRANT EXECUTE ON FUNCTION postier_ensure_partitions(int) TO postier_system;
 -- enqueues the injection job. It can neither rewrite history nor touch
 -- another role's tables.
 GRANT SELECT ON tenants, projects, api_credentials, sending_domains TO postier_app;
+-- Read by `postier wait-db`, to know whether the schema is recent enough.
+GRANT SELECT ON goose_db_version TO postier_app;
 GRANT SELECT, INSERT ON messages, events, message_contents TO postier_app;
 GRANT SELECT, INSERT, UPDATE ON idempotency_keys TO postier_app;
+-- The API lists, adds and removes suppressions.
+GRANT SELECT, INSERT, UPDATE, DELETE ON suppressions TO postier_app;
 -- River's insert is an upsert on the job's unique key, hence UPDATE.
 GRANT SELECT, INSERT, UPDATE ON river_job TO postier_app;
 GRANT USAGE, SELECT ON SEQUENCE river_job_id_seq TO postier_app;

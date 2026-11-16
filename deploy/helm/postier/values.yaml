@@ -74,6 +74,13 @@ kumomta:
     - key: postier.dev/mta
       operator: Exists
       effect: NoSchedule
+  # Source ranges allowed to inject mail, on top of the password: the pod
+  # network of your cluster (k3s: 10.42.0.0/16, kind: 10.244.0.0/16).
+  # Required with hostNetwork, where KumoMTA's HTTP listener (port 8000) is
+  # bound to the node and reachable from wherever the node is. Its admin API
+  # only ever answers to the pod itself.
+  #   injectAllowedCIDRs: ["10.42.0.0/16"]
+  injectAllowedCIDRs: []
   # Inbound SMTP (asynchronous bounces, feedback loops). In hostNetwork mode
   # KumoMTA listens on port 25 of the node. Otherwise it listens on 2525 and
   # the Service below exposes 25.

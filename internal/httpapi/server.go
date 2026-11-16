@@ -18,12 +18,14 @@ import (
 	"time"
 
 	"github.com/google/uuid"
+	openapi_types "github.com/oapi-codegen/runtime/types"
 
 	"github.com/SeeMyPing/postier/internal/accept"
 	"github.com/SeeMyPing/postier/internal/domain"
 	"github.com/SeeMyPing/postier/internal/httpapi/gen"
 	"github.com/SeeMyPing/postier/internal/store"
 	"github.com/SeeMyPing/postier/internal/store/sqlcgen"
+	"github.com/SeeMyPing/postier/internal/suppression"
 	"github.com/SeeMyPing/postier/openapi"
 )
 
@@ -41,19 +43,28 @@ type Authenticator interface {
 	Authenticate(ctx context.Context, token string) (accept.Principal, error)
 }
 
+// Suppressions manages the suppression list. Implemented by
+// suppression.Service.
+type Suppressions interface {
+	List(ctx context.Context, p accept.Principal, address string, cursor *uuid.UUID, limit int) ([]suppression.Suppression, *uuid.UUID, error)
+	Add(ctx context.Context, p accept.Principal, address, scope string, expiresAt *time.Time) (suppression.Suppression, bool, error)
+	Remove(ctx context.Context, p accept.Principal, id uuid.UUID) error
+}
+
 // Server implements gen.ServerInterface.
 type Server struct {
-	auth   Authenticator
-	sender Sender
-	pool   *store.AppPool
-	log    *slog.Logger
+	auth         Authenticator
+	sender       Sender
+	suppressions Suppressions
+	pool         *store.AppPool
+	log          *slog.Logger
 }
 
 var _ gen.ServerInterface = (*Server)(nil)
 
 // New returns the API server.
-func New(auth Authenticator, sender Sender, pool *store.AppPool, log *slog.Logger) *Server {
-	return &Server{auth: auth, sender: sender, pool: pool, log: log}
+func New(auth Authenticator, sender Sender, suppressions Suppressions, pool *store.AppPool, log *slog.Logger) *Server {
+	return &Server{auth: auth, sender: sender, suppressions: suppressions, pool: pool, log: log}
 }
 
 // Handler returns the HTTP handler: generated routes, plus the spec itself.
@@ -160,6 +171,27 @@ func deref[T any](p *T) T {
 	return *p
 }
 
+// decodeBody reads a JSON request body into v. On failure it writes the
+// problem itself and returns false.
+func (s *Server) decodeBody(w http.ResponseWriter, r *http.Request, v any) bool {
+	dec := json.NewDecoder(http.MaxBytesReader(w, r.Body, maxRequestBytes))
+	dec.DisallowUnknownFields() // the schemas say additionalProperties: false
+	if err := dec.Decode(v); err != nil {
+		var tooLarge *http.MaxBytesError
+		if errors.As(err, &tooLarge) {
+			s.writeError(w, r, domain.Errorf(domain.CodePayloadTooLarge, "request body exceeds %d bytes", maxRequestBytes))
+			return false
+		}
+		s.writeProblem(w, r, http.StatusBadRequest, domain.Errorf(domain.CodeInvalidRequest, "malformed JSON body: %v", err))
+		return false
+	}
+	if _, err := dec.Token(); !errors.Is(err, io.EOF) {
+		s.writeProblem(w, r, http.StatusBadRequest, domain.Errorf(domain.CodeInvalidRequest, "unexpected content after the JSON body"))
+		return false
+	}
+	return true
+}
+
 // --- handlers ----------------------------------------------------------------
 
 // SendEmail implements POST /v1/emails.
@@ -171,19 +203,7 @@ func (s *Server) SendEmail(w http.ResponseWriter, r *http.Request, params gen.Se
 	}
 
 	var body gen.SendEmailRequest
-	dec := json.NewDecoder(http.MaxBytesReader(w, r.Body, maxRequestBytes))
-	dec.DisallowUnknownFields() // the schema says additionalProperties: false
-	if err := dec.Decode(&body); err != nil {
-		var tooLarge *http.MaxBytesError
-		if errors.As(err, &tooLarge) {
-			s.writeError(w, r, domain.Errorf(domain.CodePayloadTooLarge, "request body exceeds %d bytes", maxRequestBytes))
-			return
-		}
-		s.writeProblem(w, r, http.StatusBadRequest, domain.Errorf(domain.CodeInvalidRequest, "malformed JSON body: %v", err))
-		return
-	}
-	if _, err := dec.Token(); !errors.Is(err, io.EOF) {
-		s.writeProblem(w, r, http.StatusBadRequest, domain.Errorf(domain.CodeInvalidRequest, "unexpected content after the JSON body"))
+	if !s.decodeBody(w, r, &body) {
 		return
 	}
 
@@ -318,4 +338,71 @@ func (s *Server) ListEmailEvents(w http.ResponseWriter, r *http.Request, id gen.
 		return
 	}
 	writeJSON(w, http.StatusOK, out)
+}
+
+func toSuppression(in suppression.Suppression) gen.Suppression {
+	out := gen.Suppression{
+		Id: in.ID, Reason: gen.SuppressionReason(in.Reason), Scope: gen.SuppressionScope(in.Scope),
+		ExpiresAt: in.ExpiresAt, CreatedAt: in.CreatedAt,
+	}
+	if in.Address != "" {
+		out.Address = &in.Address
+	}
+	return out
+}
+
+// ListSuppressions implements GET /v1/suppressions.
+func (s *Server) ListSuppressions(w http.ResponseWriter, r *http.Request, params gen.ListSuppressionsParams) {
+	p, err := s.authenticate(r)
+	if err != nil {
+		s.writeError(w, r, err)
+		return
+	}
+	items, next, err := s.suppressions.List(r.Context(), p, deref(params.Address), params.Cursor, deref(params.Limit))
+	if err != nil {
+		s.writeError(w, r, err)
+		return
+	}
+	out := gen.SuppressionList{Data: make([]gen.Suppression, len(items)), NextCursor: next}
+	for i, item := range items {
+		out.Data[i] = toSuppression(item)
+	}
+	writeJSON(w, http.StatusOK, out)
+}
+
+// AddSuppression implements POST /v1/suppressions.
+func (s *Server) AddSuppression(w http.ResponseWriter, r *http.Request) {
+	p, err := s.authenticate(r)
+	if err != nil {
+		s.writeError(w, r, err)
+		return
+	}
+	var body gen.AddSuppressionRequest
+	if !s.decodeBody(w, r, &body) {
+		return
+	}
+	item, created, err := s.suppressions.Add(r.Context(), p, body.Address, string(deref(body.Scope)), body.ExpiresAt)
+	if err != nil {
+		s.writeError(w, r, err)
+		return
+	}
+	status := http.StatusOK
+	if created {
+		status = http.StatusCreated
+	}
+	writeJSON(w, status, toSuppression(item))
+}
+
+// RemoveSuppression implements DELETE /v1/suppressions/{id}.
+func (s *Server) RemoveSuppression(w http.ResponseWriter, r *http.Request, id openapi_types.UUID) {
+	p, err := s.authenticate(r)
+	if err != nil {
+		s.writeError(w, r, err)
+		return
+	}
+	if err := s.suppressions.Remove(r.Context(), p, id); err != nil {
+		s.writeError(w, r, err)
+		return
+	}
+	w.WriteHeader(http.StatusNoContent)
 }

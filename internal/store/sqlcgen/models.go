@@ -108,6 +108,18 @@ type SendingDomain struct {
 	CreatedAt        time.Time
 }
 
+type Suppression struct {
+	ID        uuid.UUID
+	TenantID  uuid.UUID
+	ProjectID *uuid.UUID
+	AddrHash  []byte
+	Addr      *string
+	Reason    string
+	MessageID *uuid.UUID
+	ExpiresAt *time.Time
+	CreatedAt time.Time
+}
+
 type Tenant struct {
 	ID        uuid.UUID
 	Name      string

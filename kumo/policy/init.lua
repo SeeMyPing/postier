@@ -123,7 +123,34 @@ kumo.on('http_server_validate_auth_basic', function(user, password)
   return user == INJECT_USER and password == INJECT_PASSWORD
 end)
 
-kumo.on('http_message_generated', function(msg)
+-- Who may inject, by address. The password above is not the only barrier:
+-- in hostNetwork mode this listener is bound to the node, so it is reachable
+-- from wherever the node is, the Internet included. With a list of CIDRs in
+-- the data file, an injection from anywhere else is refused, even with the
+-- right password.
+local function injection_allowed(auth_info)
+  local cidrs = load_data().inject_allowed_cidrs or {}
+  if #cidrs == 0 then
+    return true
+  end
+  local peer = auth_info and auth_info.peer_address
+  if not peer then
+    return false
+  end
+  local allowed = kumo.cidr.make_map()
+  for _, cidr in ipairs(cidrs) do
+    allowed[cidr] = true
+  end
+  return allowed[peer] == true
+end
+
+kumo.on('http_message_generated', function(msg, auth_info)
+  if not injection_allowed(auth_info) then
+    -- 4xx, not 5xx: a wrong CIDR list is an operator mistake, and must not
+    -- turn every customer message into a permanent rejection.
+    kumo.reject(451, '4.7.1 injection not allowed from this address')
+  end
+
   -- dispatch sends the identifiers as per-recipient metadata, which KumoMTA
   -- stores under `extra`. Promote them to top-level keys so that they are
   -- logged with every record of this message.

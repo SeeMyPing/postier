@@ -44,6 +44,20 @@ spec:
           labelSelector:
             matchLabels:
               {{- include "postier.selector" (list $ $role) | nindent 14 }}
+      # Wait for the migration job instead of crashing until it is done.
+      initContainers:
+        - name: wait-db
+          image: {{ include "postier.image" $ }}
+          imagePullPolicy: {{ $.Values.image.pullPolicy }}
+          args: ["wait-db"]
+          securityContext:
+            {{- include "postier.securityContext" $ | nindent 12 }}
+          env:
+            {{- if eq $role "api" }}
+            {{- include "postier.secretEnv" (list $ "POSTIER_DATABASE_URL" "database-url") | nindent 12 }}
+            {{- else }}
+            {{- include "postier.secretEnv" (list $ "POSTIER_SYSTEM_DATABASE_URL" "system-database-url") | nindent 12 }}
+            {{- end }}
       containers:
         - name: {{ $role }}
           image: {{ include "postier.image" $ }}

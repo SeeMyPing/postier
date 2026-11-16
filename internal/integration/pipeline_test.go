@@ -255,7 +255,7 @@ func TestOutboxEndToEnd(t *testing.T) {
 	e := newEnv(t)
 	k := &fakeKumo{done: make(chan struct{}, 4)}
 	client, err := queue.NewWorkerClient(e.system.Raw(), queue.WorkerConfig{
-		Workers: dispatch.Workers(e.worker(t, k)), InjectConcurrency: 4, Logger: quiet,
+		Workers: dispatch.Workers(e.worker(t, k), 0), InjectConcurrency: 4, Logger: quiet,
 	})
 	if err != nil {
 		t.Fatal(err)
@@ -330,11 +330,16 @@ func (e *env) restoreSession(t *testing.T, records []kumo.Record) map[string]uui
 		}
 		e.ensureWeek(t, createdAt)
 		rcpt := rec.Recipient.First()
+		addr, err := domain.ParseAddress(rcpt)
+		if err != nil {
+			t.Fatal(err)
+		}
+		hash := addr.Hash()
 		_, err = e.admin.Exec(ctx, `
 			INSERT INTO messages (id, tenant_id, project_id, batch_id, sending_domain_id, source,
 			                      from_addr, rcpt_addr, rcpt_domain, rcpt_hash, status, status_at, created_at)
-			VALUES ($1, $2, $3, $1, $4, 'api', 'no-reply@acme.test', $5, 'sink.test', '\x00', 'accepted', $6, $6)`,
-			id, e.tenantID, e.projectID, domainID, rcpt, createdAt)
+			VALUES ($1, $2, $3, $1, $4, 'api', 'no-reply@acme.test', $5, 'sink.test', $7, 'accepted', $6, $6)`,
+			id, e.tenantID, e.projectID, domainID, rcpt, createdAt, hash[:])
 		if err != nil {
 			t.Fatal(err)
 		}

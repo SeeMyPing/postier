@@ -53,7 +53,7 @@ func (f *fakeSender) Send(_ context.Context, _ accept.Principal, req accept.Requ
 }
 
 func newTestServer(sender *fakeSender, auth fakeAuth) http.Handler {
-	return New(auth, sender, nil, slog.New(slog.NewTextHandler(io.Discard, nil))).Handler()
+	return New(auth, sender, nil, nil, slog.New(slog.NewTextHandler(io.Discard, nil))).Handler()
 }
 
 const validBody = `{"from":"Acme <no-reply@acme.test>","to":["a@example.org","b@example.org"],"subject":"Hi","text":"hello","tags":["t"],"metadata":{"k":"v"}}`
