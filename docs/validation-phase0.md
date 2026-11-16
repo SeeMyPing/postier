@@ -140,9 +140,18 @@ Garde-fou : à partir de la deuxième tentative, `dispatch` cherche un événeme
 
 Risque résiduel : un double envoi reste possible si le log hook a plus de retard que le délai de garde au moment de la reprise, par exemple quand `ingest` est indisponible pendant qu'un pod `dispatch` est tué. Dans le test du jalon, les deux pannes se chevauchaient et aucun doublon n'est apparu, parce que la reprise d'un job orphelin attend deux minutes. Ce n'est pas une preuve générale.
 
+## Suites de la phase 0 (16 novembre 2026)
+
+Corrections issues du test réel, vérifiées sur le banc et sur kind :
+
+- **Injection filtrée par adresse appelante.** En `hostNetwork`, le listener HTTP de KumoMTA écoute sur les adresses du nœud. Constat rassurant d'abord : son API d'administration ne répond qu'au pod lui-même, par les ACL par défaut de KumoMTA ; seule l'injection, protégée par mot de passe, était exposée. La politique refuse désormais une injection venue d'une adresse hors des plages déclarées (`inject_allowed_cidrs`, valeur `kumomta.injectAllowedCIDRs`), même avec le bon mot de passe, et le chart refuse le mode `hostNetwork` sans cette liste. Le refus est un `451` : une liste erronée est une erreur d'exploitation, qui ne doit pas rejeter définitivement les messages des clients.
+- **Le chart refuse un déploiement sans domaine d'envoi.**
+- **Les rôles attendent la migration** (`postier wait-db` en init container) au lieu de redémarrer en boucle : zéro redémarrage à l'installation sur kind, contre trois ou quatre.
+- **Purge des corps de messages** : un job supprime un corps dès que tous les messages de l'envoi sont clos, après une rétention réglable (`--content-retention`, zéro par défaut). Après le test des 10 000 messages, il ne reste aucun corps en base.
+
 ## Ce qui n'est pas dans la phase 0
 
-- Suppressions, webhooks, SMTP de soumission, CRD et opérateur, vérification DNS : v0.1.
+- Webhooks, SMTP de soumission, CRD et opérateur, vérification DNS : v0.1. Les suppressions, premier lot de la v0.1, sont faites.
 - Métriques Prometheus et traces OpenTelemetry. L'identifiant de trace voyage déjà de l'API jusqu'aux records, il n'est pas encore relié à des spans.
-- Purge des corps de messages à l'état terminal : la table et l'encodage existent, le job de purge non.
+- Stockage des corps sur S3 (décision D3) : seul Postgres est implémenté.
 - `NetworkPolicy` dans le chart.

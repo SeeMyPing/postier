@@ -5,6 +5,12 @@ SPDX-License-Identifier: AGPL-3.0-only
 {{- $name := printf "%s-kumomta" (include "postier.fullname" .) }}
 {{- $fullname := include "postier.fullname" . }}
 {{- $smtpPort := include "postier.kumoSmtpPort" . }}
+{{- if not .Values.domains }}
+{{- fail "domains is empty: declare at least one sending domain (and its DKIM key in dkimSecretName). Without one, KumoMTA refuses every message." }}
+{{- end }}
+{{- if and .Values.kumomta.hostNetwork (not .Values.kumomta.injectAllowedCIDRs) }}
+{{- fail "kumomta.hostNetwork needs kumomta.injectAllowedCIDRs: in this mode the injection API listens on the node's addresses, public ones included. Set it to the pod network of the cluster, e.g. [\"10.42.0.0/16\"]." }}
+{{- end }}
 {{- /* The data file read by the Lua policy: same format as
 internal/kumo.PolicyData, which is its definition. */ -}}
 {{- $domains := dict }}
@@ -39,6 +45,9 @@ Service must be named in full, or its MX lookup finds nothing. */ -}}
   "domains" $domains
   "inbound_domains" $inbound
   "routes" $routes }}
+{{- with .Values.kumomta.injectAllowedCIDRs }}
+{{- $_ := set $data "inject_allowed_cidrs" . }}
+{{- end }}
 {{- with .Values.kumomta.egress }}
 {{- $_ := set $data "egress" . }}
 {{- end }}

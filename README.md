@@ -57,6 +57,21 @@ Le message apparaît dans Mailpit, sur <http://localhost:8025>. La réponse donn
 
 Ses compteurs sont sur <http://localhost:8026/stats>.
 
+### Suppressions
+
+Postier cesse d'écrire à une adresse quand elle n'existe pas, quand son propriétaire s'est plaint, ou quand vous l'ajoutez à la main. Un envoi vers une adresse supprimée réussit quand même : son message est créé au statut `suppressed`, et rien ne part.
+
+| Cause | Durée | Portée |
+| --- | --- | --- |
+| Bounce dur : boîte inexistante ou désactivée, domaine sans MX | permanente | projet |
+| Plainte (rapport ARF) | permanente | tout le tenant |
+| 3 messages en échec en 7 jours pour boîte pleine | 7 jours | projet |
+| Ajout par l'API | au choix | projet, ou tenant avec une clé `admin` |
+
+Seuls les refus qui visent le destinataire comptent. Un `550` dû à l'IP d'envoi (liste noire) ou au contenu fait échouer le message sans toucher à l'adresse.
+
+`GET`, `POST /v1/suppressions` et `DELETE /v1/suppressions/{id}` demandent une clé portant la portée `suppressions`. Essayez sur le banc : envoyez deux fois à `550@sink.test`, le second message sera `suppressed`.
+
 ## Sur Kubernetes
 
 Sur un cluster kind local, avec Mailpit comme destination :
@@ -86,7 +101,11 @@ C'est la partie du jalon 1 qui ne se vérifie pas en local. Il faut un domaine, 
    ```
 
 3. Publier le reste du DNS : MX de `bounce.notifications.exemple.fr` vers le nœud KumoMTA, SPF sur ce même sous-domaine, et un enregistrement `_dmarc`.
-4. Installer le chart avec `domains`, `kumomta.hostname` et `seed.enabled=true`, sans `kumomta.routes`.
+4. Installer le chart avec `domains`, `kumomta.hostname`, `seed.enabled=true` et, sans `kumomta.routes` :
+   - `kumomta.injectAllowedCIDRs` : le réseau des pods du cluster, obligatoire en `hostNetwork` ;
+   - `kumomta.egress` : les adresses de sortie. Sur une machine à double pile, sans ce réglage, le noyau peut sortir en IPv6 alors que le SPF ne couvre que l'IPv4.
+
+   [`ci/production-values.yaml`](deploy/helm/postier/ci/production-values.yaml) donne le jeu de valeurs minimal.
 
 ## Développement
 
@@ -104,7 +123,7 @@ Sans `POSTIER_TEST_DATABASE_URL`, les tests d'intégration sont ignorés : `make
 ### Organisation
 
 ```text
-cmd/postier/         le binaire : api | dispatch | ingest | migrate | seed | dkim
+cmd/postier/         le binaire : api | dispatch | ingest | migrate | wait-db | seed | dkim
 internal/domain/     types purs : statuts et transitions, identifiants, adresses, signatures
 internal/accept/     pipeline d'acceptation : auth, validation, idempotence, outbox
 internal/render/     construction MIME
@@ -112,7 +131,8 @@ internal/store/      Postgres : pools app et system, requêtes sqlc, migrations
 internal/queue/      River : injection et tâches périodiques
 internal/kumo/       tout ce qui dépend de KumoMTA : client, log records, fichier de données
 internal/dispatch/   injection, garde-fou contre le double envoi
-internal/ingest/     log records vers événements et statuts
+internal/ingest/     log records vers événements, statuts et suppressions
+internal/suppression/ gestion de la liste de suppression par l'API
 internal/httpapi/    API REST, générée depuis openapi/postier.yaml
 kumo/policy/         politique Lua de KumoMTA, fixe
 db/                  migrations et requêtes SQL

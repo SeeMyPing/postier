@@ -120,7 +120,7 @@ func runSeed(ctx context.Context, args []string) error {
 		return q.InsertCredential(ctx, sqlcgen.InsertCredentialParams{
 			ID: domain.NewID(), TenantID: tenantID, ProjectID: projectID, Name: "seed",
 			Prefix: key.Prefix, SecretHash: key.SecretHash,
-			Scopes: []string{accept.ScopeSend, accept.ScopeRead},
+			Scopes: []string{accept.ScopeSend, accept.ScopeRead, accept.ScopeSuppressions},
 		})
 	})
 	if err != nil {

@@ -1,0 +1,17 @@
+# SPDX-FileCopyrightText: 2026 Nawer Kezal
+# SPDX-License-Identifier: AGPL-3.0-only
+
+# The smallest set of values a real installation needs, used to lint and
+# render the chart in its default mode (hostNetwork). Not a quickstart.
+
+kumomta:
+  hostname: mta.postier.example
+  injectAllowedCIDRs: ["10.42.0.0/16"]
+  egress:
+    sources:
+      - name: ip4-1
+        address: 203.0.113.10
+
+domains:
+  - domain: notifications.acme.example
+    selector: pst1

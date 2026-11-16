@@ -27,6 +27,8 @@ security:
 tags:
   - name: emails
     description: Send email and follow each message
+  - name: suppressions
+    description: Addresses that must not be sent to
 
 paths:
   /v1/emails:
@@ -38,6 +40,10 @@ paths:
         Accepts an email for 1 to 50 recipients. The `202` is only returned
         once the messages are durably stored: an accepted message is never
         lost, even if the MTA is down at that moment.
+
+        A recipient on the suppression list does not fail the request: its
+        message is created with the status `suppressed` and nothing is sent
+        to it.
       parameters:
         - $ref: "#/components/parameters/IdempotencyKey"
       requestBody:
@@ -127,6 +133,93 @@ paths:
           $ref: "#/components/responses/Problem"
         "404":
           $ref: "#/components/responses/Problem"
+        default:
+          $ref: "#/components/responses/Problem"
+
+  /v1/suppressions:
+    get:
+      operationId: listSuppressions
+      tags: [suppressions]
+      summary: List suppressed addresses
+      description: |
+        The suppressions that apply to the project, newest first: its own and
+        those of the whole tenant. Requires the `suppressions` scope.
+      parameters:
+        - name: address
+          in: query
+          description: Only the suppressions of this address.
+          schema:
+            type: string
+        - name: cursor
+          in: query
+          description: The `next_cursor` of the previous page.
+          schema:
+            type: string
+            format: uuid
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 200
+            default: 50
+      responses:
+        "200":
+          description: A page of suppressions
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SuppressionList"
+        default:
+          $ref: "#/components/responses/Problem"
+    post:
+      operationId: addSuppression
+      tags: [suppressions]
+      summary: Suppress an address
+      description: |
+        Idempotent. Suppressing an address that already is returns the
+        existing entry with a `200`, and never weakens it: a permanent
+        suppression stays permanent.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/AddSuppressionRequest"
+      responses:
+        "200":
+          description: The address was already suppressed
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Suppression"
+        "201":
+          description: Suppressed
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Suppression"
+        default:
+          $ref: "#/components/responses/Problem"
+
+  /v1/suppressions/{id}:
+    delete:
+      operationId: removeSuppression
+      tags: [suppressions]
+      summary: Lift a suppression
+      description: |
+        The address can be sent to again at once. Lifting a tenant-wide
+        suppression, typically a complaint, requires the `admin` scope.
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        "204":
+          description: Lifted
         default:
           $ref: "#/components/responses/Problem"
 
@@ -342,6 +435,65 @@ components:
         response:
           type: string
           description: Text of the remote server's reply.
+
+    Suppression:
+      type: object
+      required: [id, reason, scope, created_at]
+      properties:
+        id:
+          type: string
+          format: uuid
+        address:
+          type: string
+          description: Absent once the recipient asked for erasure. The suppression still applies.
+        reason:
+          type: string
+          description: |
+            `hard_bounce`: the mailbox does not exist. `complaint`: the
+            recipient reported the message as spam. `soft_bounces`: repeated
+            temporary failures. `manual`: added through this API.
+          enum: [hard_bounce, complaint, soft_bounces, manual]
+        scope:
+          type: string
+          description: "`project`, or `tenant` when it applies to every project."
+          enum: [project, tenant]
+        expires_at:
+          type: string
+          format: date-time
+          description: Absent for a permanent suppression.
+        created_at:
+          type: string
+          format: date-time
+
+    SuppressionList:
+      type: object
+      required: [data]
+      properties:
+        data:
+          type: array
+          items:
+            $ref: "#/components/schemas/Suppression"
+        next_cursor:
+          type: string
+          format: uuid
+          description: Present when there is a next page.
+
+    AddSuppressionRequest:
+      type: object
+      required: [address]
+      additionalProperties: false
+      properties:
+        address:
+          type: string
+        scope:
+          type: string
+          description: "`tenant` requires the `admin` scope."
+          enum: [project, tenant]
+          default: project
+        expires_at:
+          type: string
+          format: date-time
+          description: Omit for a permanent suppression.
 
     Problem:
       type: object

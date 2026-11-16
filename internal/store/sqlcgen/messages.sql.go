@@ -73,7 +73,7 @@ func (q *Queries) GetMessage(ctx context.Context, arg GetMessageParams) (GetMess
 }
 
 const getMessageForDispatch = `-- name: GetMessageForDispatch :one
-SELECT m.id, m.tenant_id, m.status, m.rcpt_addr, m.trace_id, m.created_at,
+SELECT m.id, m.tenant_id, m.project_id, m.status, m.rcpt_addr, m.rcpt_hash, m.trace_id, m.created_at,
        d.domain AS sending_domain, d.return_path_domain, d.verified_at AS domain_verified_at,
        c.encoding AS content_encoding, c.mime AS content_mime
 FROM messages m
@@ -90,8 +90,10 @@ type GetMessageForDispatchParams struct {
 type GetMessageForDispatchRow struct {
 	ID               uuid.UUID
 	TenantID         uuid.UUID
+	ProjectID        uuid.UUID
 	Status           string
 	RcptAddr         string
+	RcptHash         []byte
 	TraceID          *string
 	CreatedAt        time.Time
 	SendingDomain    string
@@ -107,8 +109,10 @@ func (q *Queries) GetMessageForDispatch(ctx context.Context, arg GetMessageForDi
 	err := row.Scan(
 		&i.ID,
 		&i.TenantID,
+		&i.ProjectID,
 		&i.Status,
 		&i.RcptAddr,
+		&i.RcptHash,
 		&i.TraceID,
 		&i.CreatedAt,
 		&i.SendingDomain,
@@ -121,7 +125,8 @@ func (q *Queries) GetMessageForDispatch(ctx context.Context, arg GetMessageForDi
 }
 
 const getMessageRef = `-- name: GetMessageRef :one
-SELECT tenant_id, status FROM messages WHERE id = $1 AND created_at = $2
+SELECT tenant_id, project_id, status, rcpt_addr, rcpt_hash
+FROM messages WHERE id = $1 AND created_at = $2
 `
 
 type GetMessageRefParams struct {
@@ -130,14 +135,23 @@ type GetMessageRefParams struct {
 }
 
 type GetMessageRefRow struct {
-	TenantID uuid.UUID
-	Status   string
+	TenantID  uuid.UUID
+	ProjectID uuid.UUID
+	Status    string
+	RcptAddr  string
+	RcptHash  []byte
 }
 
 func (q *Queries) GetMessageRef(ctx context.Context, arg GetMessageRefParams) (GetMessageRefRow, error) {
 	row := q.db.QueryRow(ctx, getMessageRef, arg.ID, arg.CreatedAt)
 	var i GetMessageRefRow
-	err := row.Scan(&i.TenantID, &i.Status)
+	err := row.Scan(
+		&i.TenantID,
+		&i.ProjectID,
+		&i.Status,
+		&i.RcptAddr,
+		&i.RcptHash,
+	)
 	return i, err
 }
 
@@ -359,6 +373,59 @@ func (q *Queries) ListMessageEvents(ctx context.Context, arg ListMessageEventsPa
 			return nil, err
 		}
 		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const purgeContents = `-- name: PurgeContents :many
+WITH doomed AS (
+  SELECT c.id
+  FROM message_contents c
+  WHERE c.created_at < $1
+    AND NOT EXISTS (
+      SELECT 1 FROM messages m
+      WHERE m.content_id = c.id AND m.status <> ALL($2::text[])
+    )
+  ORDER BY c.created_at
+  LIMIT $3
+  FOR UPDATE OF c SKIP LOCKED
+), detached AS (
+  UPDATE messages SET content_id = NULL
+  WHERE content_id IN (SELECT id FROM doomed)
+  RETURNING 1
+)
+DELETE FROM message_contents
+WHERE id IN (SELECT id FROM doomed)
+RETURNING id
+`
+
+type PurgeContentsParams struct {
+	Before   time.Time
+	Terminal []string
+	Batch    int32
+}
+
+// Deletes the bodies no message needs any more: every message of the send
+// has reached a terminal status, so nothing will be injected or re-injected.
+// A body is kept until then, not until injection: recovering from a lost
+// KumoMTA spool needs it. Messages are detached first, in the same
+// statement, so that none ever points at a body that is gone.
+func (q *Queries) PurgeContents(ctx context.Context, arg PurgeContentsParams) ([]uuid.UUID, error) {
+	rows, err := q.db.Query(ctx, purgeContents, arg.Before, arg.Terminal, arg.Batch)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []uuid.UUID
+	for rows.Next() {
+		var id uuid.UUID
+		if err := rows.Scan(&id); err != nil {
+			return nil, err
+		}
+		items = append(items, id)
 	}
 	if err := rows.Err(); err != nil {
 		return nil, err

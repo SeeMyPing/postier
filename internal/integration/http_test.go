@@ -20,6 +20,7 @@ import (
 	"github.com/SeeMyPing/postier/internal/httpapi/gen"
 	"github.com/SeeMyPing/postier/internal/store"
 	"github.com/SeeMyPing/postier/internal/store/sqlcgen"
+	"github.com/SeeMyPing/postier/internal/suppression"
 )
 
 func (e *env) issueKey(t *testing.T, scopes ...string) string {
@@ -63,7 +64,7 @@ func call(t *testing.T, srv *httptest.Server, method, path, key, body string, ou
 func TestAPIRoundTrip(t *testing.T) {
 	e := newEnv(t)
 	ctx := context.Background()
-	srv := httptest.NewServer(httpapi.New(accept.NewAuthenticator(e.app), e.service(), e.app, quiet).Handler())
+	srv := httptest.NewServer(httpapi.New(accept.NewAuthenticator(e.app), e.service(), suppression.NewService(e.app), e.app, quiet).Handler())
 	defer srv.Close()
 	key := e.issueKey(t, accept.ScopeSend, accept.ScopeRead)
 
@@ -137,7 +138,7 @@ func TestAPIRoundTrip(t *testing.T) {
 func TestAPIDoesNotLeakAcrossProjects(t *testing.T) {
 	e := newEnv(t)
 	ctx := context.Background()
-	srv := httptest.NewServer(httpapi.New(accept.NewAuthenticator(e.app), e.service(), e.app, quiet).Handler())
+	srv := httptest.NewServer(httpapi.New(accept.NewAuthenticator(e.app), e.service(), suppression.NewService(e.app), e.app, quiet).Handler())
 	defer srv.Close()
 	id := e.sendOne(t, "alice@example.org")
 
@@ -176,7 +177,7 @@ func TestAPIDoesNotLeakAcrossProjects(t *testing.T) {
 // A revoked key stops working at once.
 func TestRevokedKey(t *testing.T) {
 	e := newEnv(t)
-	srv := httptest.NewServer(httpapi.New(accept.NewAuthenticator(e.app), e.service(), e.app, quiet).Handler())
+	srv := httptest.NewServer(httpapi.New(accept.NewAuthenticator(e.app), e.service(), suppression.NewService(e.app), e.app, quiet).Handler())
 	defer srv.Close()
 	key := e.issueKey(t, accept.ScopeSend, accept.ScopeRead)
 	body := `{"from":"no-reply@acme.test","to":["x@example.org"],"subject":"s","text":"t"}`

@@ -19,6 +19,7 @@ import (
 	"github.com/SeeMyPing/postier/internal/platform"
 	"github.com/SeeMyPing/postier/internal/queue"
 	"github.com/SeeMyPing/postier/internal/store"
+	"github.com/SeeMyPing/postier/internal/suppression"
 )
 
 // Settings that hold a credential are read from the environment only, so
@@ -65,6 +66,7 @@ func runAPI(ctx context.Context, args []string) error {
 	server := httpapi.New(
 		accept.NewAuthenticator(pool),
 		accept.NewService(pool, jobs, accept.DefaultLimits(), log),
+		suppression.NewService(pool),
 		pool, log,
 	)
 	probes := platform.NewProbes()
@@ -86,6 +88,7 @@ func runDispatch(ctx context.Context, args []string) error {
 		signingKey   string
 		concurrency  int
 		guardDelay   time.Duration
+		retention    time.Duration
 	)
 	f := platform.NewFlags("dispatch")
 	c.register(f)
@@ -94,6 +97,8 @@ func runDispatch(ctx context.Context, args []string) error {
 	f.Int(&concurrency, "concurrency", 32, "messages injected in parallel, and connections kept open to KumoMTA")
 	f.Duration(&guardDelay, "guard-delay", dispatch.DefaultGuardDelay,
 		"on a retry, how long to wait for the log record of the previous attempt before injecting again")
+	f.Duration(&retention, "content-retention", 0,
+		"how long a message body is kept after its send is over, for debugging (0: purged at once)")
 	f.Secret(&dbURL, "system-database-url")
 	f.Secret(&kumoPassword, "kumo-inject-password")
 	f.Secret(&signingKey, "signing-key")
@@ -129,7 +134,7 @@ func runDispatch(ctx context.Context, args []string) error {
 		GuardDelay: guardDelay,
 	}
 	client, err := queue.NewWorkerClient(pool.Raw(), queue.WorkerConfig{
-		Workers: dispatch.Workers(worker), InjectConcurrency: concurrency, Logger: log,
+		Workers: dispatch.Workers(worker, retention), InjectConcurrency: concurrency, Logger: log,
 	})
 	if err != nil {
 		return err
@@ -217,6 +222,41 @@ func runIngest(ctx context.Context, args []string) error {
 		probes.Service(c.probeAddr, log),
 		platform.HTTPService("ingest", listen, svc.Handler(), log),
 	)
+}
+
+// runWaitDB is the init container of the roles. It uses the database URL the
+// role itself will use, so it also proves that this role can connect.
+func runWaitDB(ctx context.Context, args []string) error {
+	var (
+		appURL, systemURL string
+		timeout           time.Duration
+	)
+	f := platform.NewFlags("wait-db")
+	f.Duration(&timeout, "timeout", 5*time.Minute, "how long to wait before giving up")
+	f.Secret(&appURL, "database-url")
+	f.Secret(&systemURL, "system-database-url")
+	if err := f.Parse(args); err != nil {
+		return err
+	}
+	url := appURL
+	if url == "" {
+		url = systemURL
+	}
+	if url == "" {
+		return platform.Require(map[string]string{"database-url": "", "system-database-url": ""})
+	}
+	c := common{logLevel: "info", logFormat: "json"}
+	log, err := c.logger("wait-db")
+	if err != nil {
+		return err
+	}
+	ctx, cancel := context.WithTimeout(ctx, timeout)
+	defer cancel()
+	if err := store.WaitReady(ctx, url, log); err != nil {
+		return err
+	}
+	log.Info("database is ready")
+	return nil
 }
 
 func runMigrate(ctx context.Context, args []string) error {
