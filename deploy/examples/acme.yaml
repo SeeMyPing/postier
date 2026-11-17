@@ -1,0 +1,44 @@
+# SPDX-FileCopyrightText: 2026 Nawer Kezal
+# SPDX-License-Identifier: AGPL-3.0-only
+
+# A tenant, declared: who sends (Project), from which domain (SendingDomain),
+# with which key (ApiCredential). The namespace is the tenant.
+#
+#   kubectl apply -f deploy/examples/acme.yaml
+#   kubectl -n acme get projects,sendingdomains,apicredentials
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: acme
+---
+apiVersion: postier.dev/v1alpha1
+kind: Project
+metadata:
+  name: shop
+  namespace: acme
+spec:
+  displayName: Acme online shop
+---
+apiVersion: postier.dev/v1alpha1
+kind: SendingDomain
+metadata:
+  name: notifications
+  namespace: acme
+spec:
+  projectRef:
+    name: shop
+  # The domain of your From addresses. The DNS records to publish for it
+  # appear in .status.requiredRecords.
+  domain: notifications.acme.example
+---
+apiVersion: postier.dev/v1alpha1
+kind: ApiCredential
+metadata:
+  name: backend
+  namespace: acme
+spec:
+  projectRef:
+    name: shop
+  scopes: [send, read, suppressions]
+  # The key is written to a Secret of this name, key "api-key". Delete the
+  # Secret to rotate the key; delete this resource to revoke it.

@@ -21,6 +21,7 @@ type ApiCredential struct {
 	Scopes     []string
 	CreatedAt  time.Time
 	RevokedAt  *time.Time
+	ExternalID *string
 }
 
 type Event struct {
@@ -106,6 +107,7 @@ type SendingDomain struct {
 	DkimSelector     string
 	VerifiedAt       *time.Time
 	CreatedAt        time.Time
+	DeletedAt        *time.Time
 }
 
 type Suppression struct {

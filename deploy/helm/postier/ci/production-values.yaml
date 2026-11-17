@@ -11,7 +11,3 @@ kumomta:
     sources:
       - name: ip4-1
         address: 203.0.113.10
-
-domains:
-  - domain: notifications.acme.example
-    selector: pst1

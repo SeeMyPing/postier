@@ -17,6 +17,7 @@ path = [
   "internal/store/sqlcgen/**",
   "internal/httpapi/gen/api.gen.go",
   "deploy/compose/kumo/data.json",
+  "deploy/helm/postier/crds/**",
   "deploy/helm/postier/templates/NOTES.txt",
   "deploy/helm/postier/.helmignore",
   ".dockerignore",

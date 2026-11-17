@@ -128,3 +128,17 @@ func (s *Signer) parseSigned(purpose, v string) (uuid.UUID, error) {
 	}
 	return id, nil
 }
+
+// ChallengeToken is the value a tenant publishes in DNS to prove it controls
+// a domain. It is derived, not stored: the same namespace always gets the
+// same token for a domain, and another namespace gets another, so a record
+// published for one tenant proves nothing for the next.
+func (s *Signer) ChallengeToken(namespace, domainName string) string {
+	mac := hmac.New(sha256.New, s.key)
+	mac.Write([]byte("challenge"))
+	mac.Write([]byte{0})
+	mac.Write([]byte(namespace))
+	mac.Write([]byte{0})
+	mac.Write([]byte(strings.ToLower(domainName)))
+	return strings.ToLower(tagEncoding.EncodeToString(mac.Sum(nil)))[:32]
+}

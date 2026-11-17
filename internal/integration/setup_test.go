@@ -27,7 +27,14 @@ import (
 
 const envURL = "POSTIER_TEST_DATABASE_URL"
 
-var quiet = slog.New(slog.NewTextHandler(io.Discard, nil))
+// quiet discards logs, unless POSTIER_TEST_LOG is set: then they go to
+// stderr, which is how a test that hangs gets diagnosed.
+var quiet = func() *slog.Logger {
+	if os.Getenv("POSTIER_TEST_LOG") != "" {
+		return slog.New(slog.NewTextHandler(os.Stderr, &slog.HandlerOptions{Level: slog.LevelDebug}))
+	}
+	return slog.New(slog.NewTextHandler(io.Discard, nil))
+}()
 
 // env is a migrated database of its own, with the two pools of production.
 type env struct {

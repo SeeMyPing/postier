@@ -46,15 +46,12 @@ postgres:
   storage:
     size: 1Gi
 
-domains:
-  - domain: acme.test
-    selector: pst1
-
 feedbackDomain: fbl.postier.test
 
-seed:
-  enabled: true
-  tenant: acme
+# kind has no DNS zone to publish records in: trust the declared domains.
+operator:
+  replicas: 1
+  skipDNSVerification: true
 
 # Also routes every destination to it.
 mailpit:

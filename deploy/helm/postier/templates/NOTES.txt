@@ -4,33 +4,34 @@ Wait for the roles:
 
   kubectl -n {{ .Release.Namespace }} rollout status deploy/{{ include "postier.fullname" . }}-api
 
-{{- if .Values.seed.enabled }}
+KumoMTA starts once the operator has written its configuration.
 
-Your API key, shown once, is in the logs of the seed job:
+Then declare who sends, from which domain, with which key. In a namespace of
+your choice, which is the tenant:
 
-  kubectl -n {{ .Release.Namespace }} logs job/{{ include "postier.fullname" . }}-seed
+  kubectl apply -f deploy/examples/acme.yaml
+
+  kubectl -n acme get sendingdomains
+  kubectl -n acme get sendingdomain notifications -o jsonpath='{range .status.requiredRecords[*]}{.type}{"\t"}{.name}{"\t"}{.value}{"\n"}{end}'
+{{- if .Values.operator.skipDNSVerification }}
+
+DNS verification is DISABLED on this installation: any declared domain can
+send. Fine for a test cluster, never for production.
 {{- else }}
 
-Create a tenant, a sending domain and an API key:
-
-  kubectl -n {{ .Release.Namespace }} exec deploy/{{ include "postier.fullname" . }}-dispatch -- \
-    /postier seed --tenant acme --domain <your domain>
+Publish the listed DNS records: the domain becomes Ready once they are seen.
 {{- end }}
+
+The API key is in the Secret named after the ApiCredential:
+
+  kubectl -n acme get secret backend -o jsonpath='{.data.api-key}' | base64 -d
 
 Send an email:
 
   kubectl -n {{ .Release.Namespace }} port-forward svc/{{ include "postier.fullname" . }}-api 8080:{{ .Values.api.service.port }}
-  curl -X POST http://localhost:8080/v1/emails \
-    -H "Authorization: Bearer $POSTIER_API_KEY" -H "Content-Type: application/json" \
-    -d '{"from":"hello@{{ (first .Values.domains | default (dict "domain" "your-domain")).domain }}","to":["you@example.org"],"subject":"Hello","text":"It works."}'
 {{- if .Values.mailpit.enabled }}
 
 Every message lands in Mailpit:
 
   kubectl -n {{ .Release.Namespace }} port-forward svc/{{ include "postier.fullname" . }}-mailpit 8025:8025
-  open http://localhost:8025
-{{- end }}
-{{- if not .Values.domains }}
-
-No sending domain is configured: set `domains` and `dkimSecretName`.
 {{- end }}

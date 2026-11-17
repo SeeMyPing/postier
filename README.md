@@ -80,32 +80,48 @@ Sur un cluster kind local, avec Mailpit comme destination :
 make quickstart
 ```
 
-Le script crée le cluster, charge l'image, génère une clé DKIM, installe le chart avec le profil `values-quickstart.yaml` et affiche la clé d'API. Il n'écrit pas dans votre kubeconfig : les accès du cluster sont dans `.quickstart/kubeconfig`.
+Le script crée le cluster, charge l'image, installe le chart avec le profil `values-quickstart.yaml`, déclare un tenant d'exemple et affiche sa clé d'API. Il n'écrit pas dans votre kubeconfig : les accès du cluster sont dans `.quickstart/kubeconfig`.
 
-Le chart [`deploy/helm/postier`](deploy/helm/postier) déploie les rôles, KumoMTA et, par défaut, un Postgres à une instance sans sauvegarde, suffisant pour essayer. Par défaut KumoMTA tourne en `hostNetwork` sur un nœud dédié (label et taint `postier.dev/mta`), le mode d'egress simple pour une IP.
+Le chart [`deploy/helm/postier`](deploy/helm/postier) déploie les rôles, l'opérateur, KumoMTA et, par défaut, un Postgres à une instance sans sauvegarde, suffisant pour essayer. Par défaut KumoMTA tourne en `hostNetwork` sur un nœud dédié (label et taint `postier.dev/mta`), le mode d'egress simple pour une IP.
+
+### Déclarer qui envoie
+
+La configuration se fait par ressources Kubernetes, que l'opérateur traduit en lignes Postgres, en clés DKIM et en configuration KumoMTA. Le namespace est le tenant.
+
+| Ressource | Ce qu'elle déclare | Ce que fait l'opérateur |
+| --- | --- | --- |
+| `Project` | une application ou un environnement | crée le projet en base |
+| `SendingDomain` | un domaine d'expédition | génère la clé DKIM, liste les enregistrements DNS à publier, les vérifie, puis autorise l'envoi |
+| `ApiCredential` | une clé d'API et ses portées | génère la clé dans un Secret du même namespace, n'en garde que le hash |
+
+[`deploy/examples/acme.yaml`](deploy/examples/acme.yaml) déclare les trois :
+
+```bash
+kubectl apply -f deploy/examples/acme.yaml
+```
+
+Un domaine ne peut envoyer qu'une fois son DNS vérifié. Les enregistrements à publier sont dans son statut :
+
+```bash
+kubectl -n acme get sendingdomain notifications -o jsonpath='{range .status.requiredRecords[*]}{.type}{"\t"}{.name}{"\t"}{.value}{"\n"}{end}'
+```
+
+L'opérateur interroge directement les serveurs autoritaires de la zone, sans passer par un cache. Il vérifie le challenge de propriété, la clé DKIM, le MX du return-path et que son SPF couvre **toutes** les adresses d'envoi, IPv6 comprise. `kubectl -n acme get sendingdomains` montre où en est chaque domaine.
+
+- **Un domaine appartient à qui le prouve.** Deux tenants peuvent déclarer le même domaine ; chacun reçoit son propre challenge, et seul celui qui le publie obtient le domaine.
+- **Rotation d'une clé d'API** : supprimez son Secret, l'opérateur en émet une nouvelle et l'ancienne cesse de fonctionner.
+- **Révocation** : supprimez l'`ApiCredential`.
+- **Nouveau domaine** : il est pris en compte sans redémarrer KumoMTA, dans la minute (la durée de cache de la politique). Un envoi fait entre-temps n'est pas perdu : il attend dans l'outbox.
 
 ### Envoyer un email réel
 
-C'est la partie du jalon 1 qui ne se vérifie pas en local. Il faut un domaine, une IP publique dont le PTR correspond au nom EHLO, et le port 25 sortant ouvert.
+Il faut une IP publique dont le PTR correspond au nom EHLO, et le port 25 sortant ouvert. Installez le chart avec, au minimum (voir [`ci/production-values.yaml`](deploy/helm/postier/ci/production-values.yaml)) :
 
-1. Générer la clé DKIM et publier l'enregistrement affiché :
+- `kumomta.hostname` : le nom EHLO, celui du reverse DNS ;
+- `kumomta.injectAllowedCIDRs` : le réseau des pods du cluster, obligatoire en `hostNetwork` ;
+- `kumomta.egress` : les adresses de sortie. Sur une machine à double pile, sans ce réglage, le noyau peut sortir en IPv6 alors que le SPF ne couvre que l'IPv4.
 
-   ```bash
-   postier dkim --domain notifications.exemple.fr --selector pst1 --out exemple.key
-   ```
-
-2. Créer le Secret attendu par le chart :
-
-   ```bash
-   kubectl create secret generic postier-dkim --from-file=notifications.exemple.fr.pst1.key=exemple.key
-   ```
-
-3. Publier le reste du DNS : MX de `bounce.notifications.exemple.fr` vers le nœud KumoMTA, SPF sur ce même sous-domaine, et un enregistrement `_dmarc`.
-4. Installer le chart avec `domains`, `kumomta.hostname`, `seed.enabled=true` et, sans `kumomta.routes` :
-   - `kumomta.injectAllowedCIDRs` : le réseau des pods du cluster, obligatoire en `hostNetwork` ;
-   - `kumomta.egress` : les adresses de sortie. Sur une machine à double pile, sans ce réglage, le noyau peut sortir en IPv6 alors que le SPF ne couvre que l'IPv4.
-
-   [`ci/production-values.yaml`](deploy/helm/postier/ci/production-values.yaml) donne le jeu de valeurs minimal.
+Déclarez ensuite un `SendingDomain` et publiez les enregistrements de son statut.
 
 ## Développement
 
@@ -123,7 +139,8 @@ Sans `POSTIER_TEST_DATABASE_URL`, les tests d'intégration sont ignorés : `make
 ### Organisation
 
 ```text
-cmd/postier/         le binaire : api | dispatch | ingest | migrate | wait-db | seed | dkim
+api/v1alpha1/        types des ressources Kubernetes (Project, SendingDomain, ApiCredential)
+cmd/postier/         le binaire : api | dispatch | ingest | operator | migrate | wait-db | seed | dkim
 internal/domain/     types purs : statuts et transitions, identifiants, adresses, signatures
 internal/accept/     pipeline d'acceptation : auth, validation, idempotence, outbox
 internal/render/     construction MIME
@@ -134,6 +151,8 @@ internal/dispatch/   injection, garde-fou contre le double envoi
 internal/ingest/     log records vers événements, statuts et suppressions
 internal/suppression/ gestion de la liste de suppression par l'API
 internal/httpapi/    API REST, générée depuis openapi/postier.yaml
+internal/controller/ réconciliateurs de l'opérateur
+internal/dnscheck/   vérification DNS : serveurs autoritaires, DKIM, SPF, DMARC
 kumo/policy/         politique Lua de KumoMTA, fixe
 db/                  migrations et requêtes SQL
 deploy/              chart Helm, banc compose
