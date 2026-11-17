@@ -131,33 +131,25 @@ kumomta:
   # With mailpit.enabled, a "*" route to Mailpit is added automatically.
   routes: {}
 
-# Sending domains. Until the operator manages them (v0.1), each domain is
-# declared here and its DKIM key is created by hand:
-#
-#   postier dkim --domain notifications.acme.fr --selector pst1 --out acme.key
-#   kubectl create secret generic postier-dkim \
-#     --from-file=notifications.acme.fr.pst1.key=acme.key
-#
-# The key file in the Secret must be named <domain>.<selector>.key.
-domains: []
-#  - domain: notifications.acme.fr
-#    selector: pst1
-#    # Defaults to bounce.<domain>. Its MX must point at KumoMTA.
-#    returnPathDomain: bounce.notifications.acme.fr
+# The operator turns Project, SendingDomain and ApiCredential resources into
+# database rows, DKIM keys and KumoMTA configuration. See deploy/examples.
+operator:
+  # Two replicas with leader election: one works, the other takes over.
+  replicas: 2
+  # Declares every sending domain verified without looking at DNS. For
+  # clusters with no real DNS (the quickstart). Never in production: anyone
+  # who can create a SendingDomain could then send as any domain.
+  skipDNSVerification: false
+  dns:
+    # Recursive resolver, host:port. Empty: the cluster's.
+    server: ""
+    # Ask the name servers of each zone directly rather than trust a cache.
+    # Needs outbound DNS (port 53) to the Internet from the operator's pods.
+    authoritative: true
+  resources: {}
 
 # Domain receiving ARF complaints from feedback loops, e.g. fbl.postier.example.
 feedbackDomain: ""
-
-# Name of the Secret holding the DKIM keys. Required as soon as domains is
-# not empty.
-dkimSecretName: postier-dkim
-
-# Phase 0 stand-in for the Tenant, SendingDomain and ApiCredential resources:
-# a Job that creates one tenant, registers `domains` as verified and issues
-# an API key, printed once in its logs.
-seed:
-  enabled: false
-  tenant: default
 
 # Mailpit, a mail catcher with a web UI. For the quickstart only.
 mailpit:

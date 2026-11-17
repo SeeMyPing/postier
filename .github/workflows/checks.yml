@@ -60,7 +60,9 @@ jobs:
           go-version-file: go.mod
           cache: false
       - name: go test -race
-        run: go test -race -count=1 ./...
+        # KUBEBUILDER_ASSETS: an API server and etcd, for the operator
+        # tests. Without it they are skipped silently.
+        run: KUBEBUILDER_ASSETS="$(make -s envtest-path)" go test -race -count=1 ./...
       - name: Fuzz the log record decoder
         run: go test ./internal/kumo/ -run '^$' -fuzz FuzzDecodeBatch -fuzztime 30s
 

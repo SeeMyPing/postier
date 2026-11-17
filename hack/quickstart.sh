@@ -62,20 +62,19 @@ rm -f "$WORKDIR/postier.tar"
 $KIND load image-archive "$WORKDIR/postier.tar" --name "$CLUSTER"
 rm -f "$WORKDIR/postier.tar"
 
-echo "==> Generating the DKIM key of acme.test"
-go run ./cmd/postier dkim --domain acme.test --selector pst1 \
-  --out "$WORKDIR/acme.test.pst1.key" --if-missing >/dev/null
-kubectl create namespace "$NAMESPACE" --dry-run=client -o yaml | kubectl apply -f - >/dev/null
-kubectl -n "$NAMESPACE" create secret generic postier-dkim \
-  --from-file=acme.test.pst1.key="$WORKDIR/acme.test.pst1.key" \
-  --dry-run=client -o yaml | kubectl apply -f - >/dev/null
-
 echo "==> Installing the chart"
+kubectl create namespace "$NAMESPACE" --dry-run=client -o yaml | kubectl apply -f - >/dev/null
 helm upgrade --install postier deploy/helm/postier \
   --namespace "$NAMESPACE" -f deploy/helm/postier/values-quickstart.yaml \
   --wait --wait-for-jobs --timeout 10m
 
-API_KEY="$(kubectl -n "$NAMESPACE" logs job/postier-seed -c seed 2>/dev/null | grep '^pst_' | tail -1 || true)"
+echo "==> Declaring a tenant: project, sending domain, API key"
+sed 's/notifications\.acme\.example/acme.test/' deploy/examples/acme.yaml | kubectl apply -f - >/dev/null
+kubectl -n acme wait --for=condition=Ready --timeout=120s \
+  project/shop sendingdomain/notifications apicredential/backend >/dev/null
+# KumoMTA starts once the operator has written its configuration.
+kubectl -n "$NAMESPACE" rollout status statefulset/postier-kumomta --timeout=180s >/dev/null
+API_KEY="$(kubectl -n acme get secret backend -o jsonpath='{.data.api-key}' | base64 -d)"
 
 cat <<MSG
 
@@ -88,7 +87,7 @@ Postier is running. In another terminal:
 Then send your first email and watch it arrive at http://localhost:8025
 
   curl -X POST http://localhost:8080/v1/emails \\
-    -H "Authorization: Bearer ${API_KEY:-<API key: kubectl -n $NAMESPACE logs job/postier-seed>}" \\
+    -H "Authorization: Bearer $API_KEY" \\
     -H "Content-Type: application/json" \\
     -d '{"from":"Acme <hello@acme.test>","to":["you@example.org"],"subject":"Hello","text":"It works."}'
 

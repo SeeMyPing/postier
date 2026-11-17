@@ -149,9 +149,36 @@ Corrections issues du test réel, vérifiées sur le banc et sur kind :
 - **Les rôles attendent la migration** (`postier wait-db` en init container) au lieu de redémarrer en boucle : zéro redémarrage à l'installation sur kind, contre trois ou quatre.
 - **Purge des corps de messages** : un job supprime un corps dès que tous les messages de l'envoi sont clos, après une rétention réglable (`--content-retention`, zéro par défaut). Après le test des 10 000 messages, il ne reste aucun corps en base.
 
+## v0.1, lot 2 : opérateur et CRD (16 novembre 2026)
+
+Trois ressources, `Project`, `SendingDomain` et `ApiCredential`, réconciliées par `postier operator`. Le chart ne porte plus de liste statique de domaines : il fournit la part d'installation du fichier de données KumoMTA, l'opérateur y ajoute les domaines prêts.
+
+Vérifié de deux façons :
+
+- **Tests automatisés** sur un vrai serveur d'API (envtest) et un vrai Postgres, avec une zone DNS factice que le test édite pour jouer le propriétaire du domaine. Ils suivent un domaine de la déclaration à l'envoi, étape par étape.
+- **Sur kind**, avec le chart : installation, déclaration d'un tenant, envoi, puis ajout d'un second domaine sans redémarrage de KumoMTA, rotation et révocation d'une clé, conflit entre deux tenants, suppression d'un domaine.
+
+Choix de conception à connaître :
+
+- **La base n'apprend l'existence d'un domaine qu'une fois sa propriété prouvée.** L'unicité d'un domaine entre tenants est tenue par un index unique, premier arrivé, premier servi : sans cette précaution, il suffirait de déclarer un nom pour le bloquer. Le challenge est dérivé du namespace et du domaine, donc deux tenants n'ont jamais le même.
+- **Une panne de résolution DNS ne change rien.** Seule une réponse définitive (enregistrement absent ou différent) retire la vérification d'un domaine ; un `SERVFAIL` laisse l'état en place.
+- **Le SPF du return-path est évalué pour chaque adresse de sortie**, `include` et `redirect` compris. C'est la vérification qui aurait évité le `spf=fail` du premier envoi réel.
+- **Le Secret d'une clé d'API fait foi.** L'opérateur ne voit que les Secrets qu'il a lui-même étiquetés, et n'adopte jamais un Secret préexistant : son contenu deviendrait une clé valide.
+- **L'opérateur annote le pod KumoMTA quand le fichier de données change.** Un volume ConfigMap n'est resynchronisé que périodiquement : mesuré sur kind, un domaine était `Ready` et KumoMTA répondait encore « domaine non configuré » pendant 100 secondes. Modifier une annotation du pod déclenche la synchronisation tout de suite, sans rien redémarrer : un envoi fait juste après le passage à `Ready` est livré en 7 secondes au lieu de 108. Reste la durée de cache de la politique (5 s sur kind, 60 s par défaut). Dans tous les cas le message attend dans l'outbox, il n'est pas perdu.
+- **Un domaine supprimé garde sa ligne en base**, marquée retirée : ses messages y renvoient encore. Son nom redevient libre.
+
+Non fait dans ce lot, à reprendre :
+
+- `WebhookEndpoint` : sa CRD arrive avec le lot 3, qui définit ce qu'elle configure.
+- Mode `external-dns` (création des enregistrements par `DNSEndpoint`) et rotation des clés DKIM.
+- Webhook d'admission : l'unicité des domaines est tenue en base et signalée par une condition, pas refusée à la création.
+- Les clés DKIM sont dans un seul Secret, soit environ 500 domaines ; le plan en prévoit plusieurs.
+- Le droit de l'opérateur sur les Secrets couvre tout le cluster : RBAC ne sait pas filtrer par étiquette.
+- En `hostNetwork` et en production, la vérification DNS réelle par l'opérateur n'a pas été exercée : le VPS de test a été rendu avant ce lot.
+
 ## Ce qui n'est pas dans la phase 0
 
-- Webhooks, SMTP de soumission, CRD et opérateur, vérification DNS : v0.1. Les suppressions, premier lot de la v0.1, sont faites.
+- Webhooks et SMTP de soumission : v0.1. Les suppressions et l'opérateur, lots 1 et 2, sont faits.
 - Métriques Prometheus et traces OpenTelemetry. L'identifiant de trace voyage déjà de l'API jusqu'aux records, il n'est pas encore relié à des spans.
 - Stockage des corps sur S3 (décision D3) : seul Postgres est implémenté.
 - `NetworkPolicy` dans le chart.

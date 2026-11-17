@@ -1,0 +1,159 @@
+{{/*
+SPDX-FileCopyrightText: 2026 Nawer Kezal
+SPDX-License-Identifier: AGPL-3.0-only
+*/}}
+{{- $name := printf "%s-operator" (include "postier.fullname" .) }}
+{{- $fullname := include "postier.fullname" . }}
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: {{ $name }}
+  labels:
+    {{- include "postier.labels" . | nindent 4 }}
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: {{ $name }}
+  labels:
+    {{- include "postier.labels" . | nindent 4 }}
+rules:
+  - apiGroups: ["postier.dev"]
+    resources: ["projects", "sendingdomains", "apicredentials"]
+    # update: to add and remove its finalizer.
+    verbs: ["get", "list", "watch", "update", "patch"]
+  - apiGroups: ["postier.dev"]
+    resources: ["projects/status", "sendingdomains/status", "apicredentials/status"]
+    verbs: ["get", "update", "patch"]
+  - apiGroups: ["postier.dev"]
+    resources: ["projects/finalizers", "sendingdomains/finalizers", "apicredentials/finalizers"]
+    verbs: ["update"]
+  # An API key is written to a Secret next to its ApiCredential, in whatever
+  # namespace that is: hence a cluster-wide rule. RBAC cannot filter by
+  # label; the operator itself only caches, reads and adopts the Secrets it
+  # created and labelled.
+  - apiGroups: [""]
+    resources: ["secrets"]
+    verbs: ["get", "list", "watch", "create", "update", "delete"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: {{ $name }}
+  labels:
+    {{- include "postier.labels" . | nindent 4 }}
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: {{ $name }}
+subjects:
+  - kind: ServiceAccount
+    name: {{ $name }}
+    namespace: {{ .Release.Namespace }}
+---
+# In its own namespace: KumoMTA's data file, and the leader election.
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: {{ $name }}
+  labels:
+    {{- include "postier.labels" . | nindent 4 }}
+rules:
+  - apiGroups: [""]
+    resources: ["configmaps"]
+    verbs: ["get", "create", "update"]
+  # KumoMTA's pods are annotated when the data file changes, which makes the
+  # kubelet refresh the mounted file at once.
+  - apiGroups: [""]
+    resources: ["pods"]
+    verbs: ["list", "patch"]
+  - apiGroups: ["coordination.k8s.io"]
+    resources: ["leases"]
+    verbs: ["get", "create", "update"]
+  - apiGroups: [""]
+    resources: ["events"]
+    verbs: ["create", "patch"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: {{ $name }}
+  labels:
+    {{- include "postier.labels" . | nindent 4 }}
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: {{ $name }}
+subjects:
+  - kind: ServiceAccount
+    name: {{ $name }}
+    namespace: {{ .Release.Namespace }}
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ $name }}
+  labels:
+    {{- include "postier.labels" . | nindent 4 }}
+    app.kubernetes.io/component: operator
+spec:
+  replicas: {{ .Values.operator.replicas }}
+  selector:
+    matchLabels:
+      {{- include "postier.selector" (list . "operator") | nindent 6 }}
+  template:
+    metadata:
+      labels:
+        {{- include "postier.labels" . | nindent 8 }}
+        app.kubernetes.io/component: operator
+    spec:
+      serviceAccountName: {{ $name }}
+      {{- with .Values.imagePullSecrets }}
+      imagePullSecrets:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      initContainers:
+        - name: wait-db
+          image: {{ include "postier.image" . }}
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          args: ["wait-db"]
+          securityContext:
+            {{- include "postier.securityContext" . | nindent 12 }}
+          env:
+            {{- include "postier.secretEnv" (list . "POSTIER_SYSTEM_DATABASE_URL" "system-database-url") | nindent 12 }}
+      containers:
+        - name: operator
+          image: {{ include "postier.image" . }}
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          args: ["operator"]
+          securityContext:
+            {{- include "postier.securityContext" . | nindent 12 }}
+          env:
+            - name: POSTIER_LOG_LEVEL
+              value: {{ .Values.logLevel | quote }}
+            - name: POSTIER_NAMESPACE
+              valueFrom:
+                fieldRef:
+                  fieldPath: metadata.namespace
+            - name: POSTIER_BASE_CONFIGMAP
+              value: {{ $fullname }}-kumomta-base
+            - name: POSTIER_DATA_CONFIGMAP
+              value: {{ $fullname }}-kumomta-data
+            - name: POSTIER_DKIM_SECRET
+              value: {{ $fullname }}-dkim
+            - name: POSTIER_KUMOMTA_POD_SELECTOR
+              value: "app.kubernetes.io/instance={{ .Release.Name }},app.kubernetes.io/component=kumomta"
+            - name: POSTIER_SKIP_DNS_VERIFICATION
+              value: {{ .Values.operator.skipDNSVerification | quote }}
+            - name: POSTIER_DNS_SERVER
+              value: {{ .Values.operator.dns.server | quote }}
+            - name: POSTIER_DNS_AUTHORITATIVE
+              value: {{ .Values.operator.dns.authoritative | quote }}
+            {{- include "postier.secretEnv" (list . "POSTIER_SYSTEM_DATABASE_URL" "system-database-url") | nindent 12 }}
+            {{- include "postier.secretEnv" (list . "POSTIER_SIGNING_KEY" "signing-key") | nindent 12 }}
+          ports:
+            - name: probes
+              containerPort: 8090
+          {{- include "postier.probes" . | nindent 10 }}
+          resources:
+            {{- toYaml .Values.operator.resources | nindent 12 }}

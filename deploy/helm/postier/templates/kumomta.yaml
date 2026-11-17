@@ -5,21 +5,14 @@ SPDX-License-Identifier: AGPL-3.0-only
 {{- $name := printf "%s-kumomta" (include "postier.fullname" .) }}
 {{- $fullname := include "postier.fullname" . }}
 {{- $smtpPort := include "postier.kumoSmtpPort" . }}
-{{- if not .Values.domains }}
-{{- fail "domains is empty: declare at least one sending domain (and its DKIM key in dkimSecretName). Without one, KumoMTA refuses every message." }}
-{{- end }}
 {{- if and .Values.kumomta.hostNetwork (not .Values.kumomta.injectAllowedCIDRs) }}
 {{- fail "kumomta.hostNetwork needs kumomta.injectAllowedCIDRs: in this mode the injection API listens on the node's addresses, public ones included. Set it to the pod network of the cluster, e.g. [\"10.42.0.0/16\"]." }}
 {{- end }}
-{{- /* The data file read by the Lua policy: same format as
-internal/kumo.PolicyData, which is its definition. */ -}}
-{{- $domains := dict }}
+{{- /* The installation's part of the data file read by the Lua policy, in
+the format of internal/kumo.PolicyData. Sending domains are not here: the
+operator adds them from SendingDomain resources and writes the complete
+file to the -data ConfigMap. */ -}}
 {{- $inbound := dict }}
-{{- range .Values.domains }}
-{{- $selector := .selector | default "pst1" }}
-{{- $_ := set $domains .domain (dict "selector" $selector "key_file" (printf "/opt/kumomta/etc/dkim/%s.%s.key" .domain $selector)) }}
-{{- $_ := set $inbound (.returnPathDomain | default (printf "bounce.%s" .domain)) true }}
-{{- end }}
 {{- with .Values.feedbackDomain }}
 {{- $_ := set $inbound . true }}
 {{- end }}
@@ -42,7 +35,7 @@ Service must be named in full, or its MX lookup finds nothing. */ -}}
     "retry_interval" .Values.kumomta.queue.retryInterval
     "max_retry_interval" .Values.kumomta.queue.maxRetryInterval
     "max_age" .Values.kumomta.queue.maxAge)
-  "domains" $domains
+  "domains" (dict)
   "inbound_domains" $inbound
   "routes" $routes }}
 {{- with .Values.kumomta.injectAllowedCIDRs }}
@@ -61,17 +54,19 @@ data:
   init.lua: |
     {{- .Files.Get "files/init.lua" | nindent 4 }}
 ---
-# Mounted as a directory, not with subPath: the kubelet then updates the
-# file in place and the policy picks it up at its next re-read. Adding a
-# sending domain never restarts the MTA.
+# The installation's part of the data file. The operator merges the sending
+# domains into it and writes the result to {{ $name }}-data, which is what
+# KumoMTA mounts: as a directory, not with subPath, so that the kubelet
+# updates the file in place and the policy picks it up at its next re-read.
+# Adding a sending domain never restarts the MTA.
 apiVersion: v1
 kind: ConfigMap
 metadata:
-  name: {{ $name }}-data
+  name: {{ $name }}-base
   labels:
     {{- include "postier.labels" . | nindent 4 }}
 data:
-  data.json: |
+  base.json: |
     {{- $data | toPrettyJson | nindent 4 }}
 ---
 # Injection API, for dispatch. Never exposed outside the namespace.
@@ -225,15 +220,13 @@ spec:
         - name: data
           configMap:
             name: {{ $name }}-data
+        # Both are written by the operator. Until it has run once, the pod
+        # waits in ContainerCreating.
         - name: dkim
-          {{- if .Values.domains }}
           secret:
-            secretName: {{ required "dkimSecretName is required when domains is set" .Values.dkimSecretName }}
+            secretName: {{ $fullname }}-dkim
             # Readable by the kumod group (fsGroup), nobody else.
             defaultMode: 0440
-          {{- else }}
-          emptyDir: {}
-          {{- end }}
         - name: logs
           emptyDir:
             sizeLimit: 1Gi

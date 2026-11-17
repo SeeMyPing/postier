@@ -10,6 +10,8 @@ COMPOSE   ?= $(CONTAINER) compose
 GOLANGCI_LINT := go run github.com/golangci/golangci-lint/v2/cmd/golangci-lint@v2.15.0
 GOVULNCHECK   := go run golang.org/x/vuln/cmd/govulncheck@v1.9.0
 SQLC          := go run github.com/sqlc-dev/sqlc/cmd/sqlc@v1.31.1
+CONTROLLER_GEN := go run sigs.k8s.io/controller-tools/cmd/controller-gen@v0.23.0
+SETUP_ENVTEST  := go run sigs.k8s.io/controller-runtime/tools/setup-envtest@release-0.25
 
 TEST_DB_PORT ?= 55432
 TEST_DB_URL  := postgres://postgres:test@localhost:$(TEST_DB_PORT)/postgres
@@ -30,6 +32,8 @@ build: ## Build the postier binary into bin/
 generate: ## Regenerate code from SQL and OpenAPI, and sync the chart's policy
 	$(SQLC) generate
 	go generate ./...
+	$(CONTROLLER_GEN) object:headerFile=hack/boilerplate.go.txt paths=./api/...
+	$(CONTROLLER_GEN) crd paths=./api/... output:crd:dir=deploy/helm/postier/crds
 	cp kumo/policy/init.lua deploy/helm/postier/files/init.lua
 
 .PHONY: test
@@ -37,13 +41,18 @@ test: ## Unit tests, with the race detector
 	go test -race ./...
 
 .PHONY: test-integration
-test-integration: ## All tests, including those that need Postgres (starts a throwaway one)
+test-integration: ## All tests, including those that need Postgres and a Kubernetes API server
 	-$(CONTAINER) rm -f postier-test-pg >/dev/null 2>&1
 	$(CONTAINER) run -d --rm --name postier-test-pg -e POSTGRES_PASSWORD=test \
 		-p 127.0.0.1:$(TEST_DB_PORT):5432 docker.io/library/postgres:16-alpine >/dev/null
 	@until $(CONTAINER) exec postier-test-pg pg_isready -U postgres >/dev/null 2>&1; do sleep 0.5; done
-	POSTIER_TEST_DATABASE_URL=$(TEST_DB_URL) go test -race -count=1 ./...; \
+	POSTIER_TEST_DATABASE_URL=$(TEST_DB_URL) KUBEBUILDER_ASSETS="$$($(SETUP_ENVTEST) use -p path)" \
+		go test -race -count=1 ./...; \
 		status=$$?; $(CONTAINER) rm -f postier-test-pg >/dev/null; exit $$status
+
+.PHONY: envtest-path
+envtest-path: ## Print the directory of the API server binaries the operator tests need
+	@$(SETUP_ENVTEST) use -p path
 
 .PHONY: fuzz
 fuzz: ## Fuzz the log record decoder for a minute
@@ -94,10 +103,9 @@ chart-lint: ## Lint and render the Helm chart with both profiles
 	helm lint deploy/helm/postier -f deploy/helm/postier/values-quickstart.yaml
 	helm template postier deploy/helm/postier -f deploy/helm/postier/ci/production-values.yaml >/dev/null
 	helm template postier deploy/helm/postier -f deploy/helm/postier/values-quickstart.yaml >/dev/null
-	@# The defaults alone must be refused: no sending domain, and hostNetwork
-	@# without a restriction on who may inject.
-	@! helm template postier deploy/helm/postier >/dev/null 2>&1 || (echo "the chart rendered without a sending domain" && exit 1)
-	@! helm template postier deploy/helm/postier --set 'domains[0].domain=a.example' >/dev/null 2>&1 || (echo "hostNetwork rendered without injectAllowedCIDRs" && exit 1)
+	@# The defaults alone must be refused: hostNetwork without a restriction
+	@# on who may inject.
+	@! helm template postier deploy/helm/postier >/dev/null 2>&1 || (echo "hostNetwork rendered without injectAllowedCIDRs" && exit 1)
 
 .PHONY: quickstart
 quickstart: ## Postier on a local kind cluster, delivering to Mailpit
